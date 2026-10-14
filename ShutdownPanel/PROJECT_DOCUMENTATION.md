@@ -6,7 +6,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![WebView2](https://img.shields.io/badge/Edge%20WebView2-PyWebView-0078D7?style=for-the-badge&logo=microsoft-edge&logoColor=white)
 ![Version](https://img.shields.io/badge/Version-2.0.0-10b981?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-amber?style=for-the-badge)
+![License](https://img.shields.io/badge/License-ARN%20Technology-00d2ff?style=for-the-badge)
 
 # نظام Shutdown Panel المتكامل لإدارة الطاقة والتحكم عن بعد
 ### تطوير وهندسة برمجية: **عبده رجب نصار**
