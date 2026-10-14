@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Build outputs
+build/
+dist/
+*.spec
+assets/icon.ico
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local settings & Logs
+*.local.json
+*.log
+*.rar
+folderico-*.ico
+.pytest_tmp/
+

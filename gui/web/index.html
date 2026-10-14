@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shutdown Panel</title>
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body style="background: var(--bg); color: var(--text); margin: 0; padding: 0; overflow: hidden;">
+
+  <!-- Premium Animated Splash Screen -->
+  <div id="appSplashScreen" class="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo power-ring pulse-glow">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+      </div>
+      <h1 class="splash-title">Shutdown Panel</h1>
+      <p class="splash-subtitle">جاري تشغيل لوحة التحكم...</p>
+      <div class="splash-loader">
+        <div class="splash-progress"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-container">
+    <div class="app-window panel-shadow">
+      
+      <!-- Titlebar -->
+      <div class="window-titlebar">
+        <div class="brand-section">
+          <div class="brand-logo-icon">
+            <span id="brandPowerIcon"></span>
+          </div>
+          <div class="brand-badge">
+            <span class="brand-title">Shutdown Panel</span>
+            <span class="brand-subtitle" id="lblSubtitle">لوحة تحكم الجهاز</span>
+            <span class="status-badge" id="lblConnStatus">متصل</span>
+          </div>
+        </div>
+
+        <div class="window-controls">
+          <button class="icon-btn" id="btnAbout" title="حول البرنامج / About">
+            <span id="aboutIcon"></span>
+          </button>
+          <button class="icon-btn" id="btnThemeToggle" title="Theme">
+            <span id="themeIcon"></span>
+          </button>
+          <button class="icon-btn" id="btnLangToggle" title="Language" style="font-weight: 700; font-size: 11px;">
+            EN
+          </button>
+          <button class="icon-btn" id="btnMinimize" title="Minimize">
+            <span id="minIcon"></span>
+          </button>
+          <button class="icon-btn btn-close" id="btnClose" title="Close">
+            <span id="closeIcon"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats & Server Sub-header -->
+      <div class="stats-header">
+        <!-- Server Status + Power Button (Left in RTL) -->
+        <div class="server-pill">
+          <button class="server-indicator-btn power-ring pulse-glow" id="btnHeaderPower" title="إيقاف فوري للجهاز">
+            <span id="headerPowerIcon"></span>
+          </button>
+          <span>Server: <b id="lblServerStatus" style="color: var(--ok);">غير متصل</b></span>
+        </div>
+
+        <!-- Hardware Stats (Right in RTL) -->
+        <div id="statsRow" style="display: flex; gap: 10px; align-items: center;">
+          <span id="batteryPill" class="battery-pill" style="display:none;">🔋 <b id="batteryVal">0%</b></span>
+          <span>RAM: <b id="ramVal" style="color: var(--text);">0.0%</b></span>
+          <span style="opacity: 0.4;">|</span>
+          <span>CPU: <b id="cpuVal" style="color: var(--text);">0.0%</b></span>
+          <span id="tempDivider" style="opacity: 0.4; display: none;">|</span>
+          <span id="tempRow" style="display: none;">الحرارة: <b id="tempVal">0°</b></span>
+        </div>
+      </div>
+
+      <!-- Tabs Bar -->
+      <div class="tabs-bar">
+        <button class="tab-pill active" data-tab="timer">
+          <span id="tabIconTimer"></span>
+          <span id="lblTabTimer">المؤقت</span>
+        </button>
+        <button class="tab-pill" data-tab="remote">
+          <span id="tabIconRemote"></span>
+          <span id="lblTabRemote">التحكم عن بعد</span>
+        </button>
+        <button class="tab-pill" data-tab="quick">
+          <span id="tabIconQuick"></span>
+          <span id="lblTabQuick">إجراءات سريعة</span>
+        </button>
+        <button class="tab-pill" data-tab="schedules">
+          <span id="tabIconSched">🗓️</span>
+          <span id="lblTabSched">الجدولة</span>
+        </button>
+        <button class="tab-pill" data-tab="settings">
+          <span id="tabIconSettings"></span>
+          <span id="lblTabSettings">الإعدادات</span>
+        </button>
+      </div>
+
+      <!-- Content Area -->
+      <div class="tab-content-area">
+        
+        <!-- TAB 1: TIMER -->
+        <div class="pane active" id="pane-timer">
+          <!-- Card 1: Time Pickers -->
+          <div class="box-card">
+            <h2 style="text-align: center; font-size: 16px; font-weight: 700; margin-bottom: 16px;">
+              <span id="lblSetTime">ضبط وقت الإيقاف</span> <span style="font-size: 18px;">⏰</span>
+            </h2>
+            <div class="inputs-grid">
+              <div class="field-group">
+                <label class="field-label" id="lblHours">ساعات</label>
+                <select class="large-select-box" id="selectHours"></select>
+              </div>
+              <div class="field-group">
+                <label class="field-label" id="lblMinutes">دقائق</label>
+                <select class="large-select-box" id="selectMinutes"></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Status / Countdown Box -->
+          <div class="box-card" id="statusCard">
+            <!-- Active Countdown state -->
+            <div id="runningCountdownBox" style="display: none; text-align: center; padding: 12px 0;">
+              <div style="font-size: 12px; color: var(--muted); margin-bottom: 4px;">
+                <span id="lblRemaining">الوقت المتبقي لإيقاف التشغيل</span>
+              </div>
+              <div class="tick" id="cdTimeDisplay" style="font-family: monospace; font-size: 46px; font-weight: 800; color: var(--cyan); letter-spacing: 2px;">
+                00:00:00
+              </div>
+              <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; margin: 14px 0 10px 0;">
+                <div class="countdown-bar" id="cdProgressBar" style="width: 100%; height: 100%; border-radius: 99px;"></div>
+              </div>
+              <div style="display: flex; justify-content: center; gap: 10px; margin-top: 8px;">
+                <button class="ghost-btn" id="btnPauseResume">
+                  <span id="cdPauseIcon"></span> <span id="lblBtnPause">إيقاف مؤقت</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Big Glowing Neon Button -->
+            <button class="btn-big-start cyan-glow" id="btnStartMain">
+              <span id="boltIcon"></span>
+              <span id="lblStartBtn">بدء العداد</span>
+            </button>
+          </div>
+
+          <!-- Card 3: Quick Presets -->
+          <div class="box-card">
+            <!-- Quick Presets -->
+            <div class="presets-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <button class="preset-btn" data-secs="300" id="p5m" style="padding: 12px;">5 دقائق</button>
+              <button class="preset-btn" data-secs="900" id="p15m" style="padding: 12px;">15 دقيقة</button>
+              <button class="preset-btn" data-secs="1800" id="p30m" style="padding: 12px;">30 دقيقة</button>
+              <button class="preset-btn" data-secs="3600" id="p1h" style="padding: 12px;">ساعة واحدة</button>
+            </div>
+          </div>
+
+          <!-- Bottom Hint -->
+          <div class="bottom-hint" id="lblBottomHint">
+            انقر مزدوجاً على شريط العداد لإلغاء العد التنازلي
+          </div>
+        </div>
+
+        <!-- TAB 2: REMOTE CONTROL -->
+        <div class="pane" id="pane-remote">
+          <div class="box-card">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                  <span id="remoteWifiIcon"></span>
+                  <span id="lblRemoteTitle">التحكم عن بعد</span>
+                  <span class="status-badge" id="lblRemoteBadge" style="background: rgba(251,113,133,0.15); color: var(--danger);">غير متصل</span>
+                </div>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 6px;" id="lblRemoteDescription">اسمح لأجهزة أخرى على الشبكة بالتحكم في الجهاز.</p>
+              </div>
+              <button class="ghost-btn" id="btnServerToggle">تفعيل</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;">
+              <div>
+                <label class="field-label" id="lblBindAddr">عنوان الربط</label>
+                <select class="large-select-box" id="selectBindAddr" style="font-size: 14px; padding: 10px;"></select>
+              </div>
+              <div>
+                <label class="field-label" id="lblPortNum">المنفذ</label>
+                <input type="number" id="inputPortNum" value="8080" class="large-select-box" style="font-size: 14px; padding: 10px; color: var(--text);" />
+              </div>
+            </div>
+
+            <!-- Credentials Box (Username & Password) -->
+            <div style="background: var(--panel); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; margin-top: 12px;">
+              <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="display: flex; align-items: center; gap: 6px;">🔐 <span id="lblAuthCredentials">بيانات الدخول للتحكم</span></span>
+                <button class="ghost-btn" id="btnSaveCredentials" style="font-size: 11px; padding: 4px 10px; color: var(--cyan);">حفظ التعديل</button>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                  <label class="field-label" style="font-size: 11px;" id="lblUsername">اسم المستخدم</label>
+                  <input type="text" id="inputRemoteUsername" value="admin" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="off" />
+                </div>
+                <div>
+                  <label class="field-label" style="font-size: 11px;" id="lblPassword">كلمة المرور</label>
+                  <input type="text" id="inputRemotePassword" value="admin" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="off" />
+                </div>
+              </div>
+              <div id="remoteUrls" style="font-size: 12px; color: var(--cyan); margin-top: 10px; font-family: monospace; word-break: break-all;"></div>
+            </div>
+
+            <!-- QR Code Section for Instant Phone Connection -->
+            <div id="qrSectionBox" style="display: flex; align-items: center; gap: 16px; background: rgba(6,182,212,0.05); border: 1px dashed var(--cyan); border-radius: 14px; padding: 14px; margin-top: 12px;">
+              <div style="background: #fff; padding: 6px; border-radius: 10px; display: flex; align-items: center; justify-content: center; min-width: 110px; min-height: 110px;">
+                <img id="qrCodeImg" src="" alt="QR Code" style="width: 100px; height: 100px; display: block;" />
+              </div>
+              <div>
+                <strong style="font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 6px;">
+                  <span>📱</span> <span id="lblQrTitle">مسح رمز QR للاتصال الفوري</span>
+                </strong>
+                <p style="font-size: 12px; color: var(--muted); margin-top: 4px;" id="lblQrDesc">
+                  افتح كاميرا الهاتف وامسح الكود لفتح لوحة التحكم الكاملة والاتصال تلقائياً بدون كتابة الرمز!
+                </p>
+                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                  <button class="ghost-btn" id="btnCopyFullLink" style="font-size: 11px; padding: 4px 10px;">
+                    📋 نسخ الرابط المباشر
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="box-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <h3 style="font-size: 13px; font-weight: 700;" id="lblClientsTitle">الأجهزة المتصلة</h3>
+            </div>
+            <div id="clientsList" style="font-size: 12px; color: var(--muted); text-align: center; padding: 12px 0;">
+              لا توجد أجهزة متصلة حالياً
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: QUICK ACTIONS -->
+        <div class="pane" id="pane-quick">
+          <div class="box-card">
+            <div class="tiles-grid">
+              <div class="action-tile" data-action="shutdown">
+                <div class="action-tile-icon" style="color: var(--danger);"><span id="qIconShutdown"></span></div>
+                <strong id="qLblShutdown" style="font-size: 13px;">إيقاف التشغيل</strong>
+              </div>
+              <div class="action-tile" data-action="restart">
+                <div class="action-tile-icon"><span id="qIconRestart"></span></div>
+                <strong id="qLblRestart" style="font-size: 13px;">إعادة التشغيل</strong>
+              </div>
+              <div class="action-tile" data-action="sleep">
+                <div class="action-tile-icon"><span id="qIconSleep"></span></div>
+                <strong id="qLblSleep" style="font-size: 13px;">وضع النوم</strong>
+              </div>
+              <div class="action-tile" data-action="display_off">
+                <div class="action-tile-icon"><span id="qIconDisplayOff"></span></div>
+                <strong id="qLblDisplayOff" style="font-size: 13px;">إطفاء الشاشة</strong>
+              </div>
+              <div class="action-tile" data-action="lock">
+                <div class="action-tile-icon"><span id="qIconLock"></span></div>
+                <strong id="qLblLock" style="font-size: 13px;">قفل الجهاز</strong>
+              </div>
+              <div class="action-tile" data-action="signout">
+                <div class="action-tile-icon"><span id="qIconSignout"></span></div>
+                <strong id="qLblSignout" style="font-size: 13px;">تسجيل الخروج</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="box-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div>
+                <strong style="font-size: 13px;" id="lblCustomLockTitle">🛡️ شاشة القفل المخصصة (ARN Lock)</strong>
+                <p style="font-size: 11px; color: var(--muted); margin-top: 2px;" id="lblCustomLockDesc">
+                  تجميد الشاشة بنافذة كاملة مخصصة ومنع المتطفلين وعرض رسالة صيانة
+                </p>
+              </div>
+              <span class="status-badge" id="badgeDesktopLockStatus" style="background: rgba(148, 163, 184, 0.15); color: var(--muted);">مفتوح</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input 
+                type="text" 
+                id="inputDesktopLockMsg" 
+                class="large-select-box" 
+                style="flex: 1; text-align: start; font-size: 13px; padding: 8px 12px;" 
+                placeholder="الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب" 
+                value="الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب"
+              />
+              <button class="ghost-btn" id="btnTriggerCustomLock" style="padding: 0 16px; border-color: var(--cyan); color: var(--cyan); white-space: nowrap;">
+                🔒 قفل الشاشة الآن
+              </button>
+            </div>
+          </div>
+
+          <div class="box-card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong style="font-size: 13px;" id="lblAbortTile">إلغاء أي أمر معلّق</strong>
+              <p style="font-size: 11px; color: var(--muted);">shutdown.exe /a</p>
+            </div>
+            <button class="ghost-btn danger" id="btnAbortSys">
+              <span id="abortBanIcon"></span> <span id="lblBtnAbort">إلغاء الآن</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 4: SCHEDULES -->
+        <div class="pane" id="pane-schedules">
+          <div class="box-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 14px;" id="lblSchedTitle">جدولة أسبوعية</strong>
+                <p style="font-size: 11px; color: var(--muted); margin-top: 4px;" id="lblSchedDesc">
+                  نفّذ إجراءً تلقائيًا في أوقات محددة من الأسبوع — مثل إيقاف التشغيل يوميًا 23:00
+                </p>
+              </div>
+            </div>
+
+            <div id="schedulesList" style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="text-align: center; color: var(--muted); font-size: 12px; padding: 14px 0;" id="noSchedulesMsg">
+                لا توجد جدولة بعد
+              </div>
+            </div>
+
+            <div class="sched-form">
+              <div>
+                <label class="field-label" id="lblSchedAction">الإجراء</label>
+                <select class="large-select-box" id="schedAction" style="font-size: 13px; padding: 9px;">
+                  <option value="shutdown">إيقاف التشغيل</option>
+                  <option value="restart">إعادة التشغيل</option>
+                  <option value="sleep">وضع النوم</option>
+                  <option value="display_off">إطفاء الشاشة</option>
+                  <option value="lock">قفل الجهاز</option>
+                  <option value="signout">تسجيل الخروج</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" id="lblSchedTime">الوقت</label>
+                <input type="time" id="schedTime" value="23:00" class="large-select-box" style="font-size: 13px; padding: 9px; color: var(--text);" />
+              </div>
+              <div class="sched-days" id="schedDays"></div>
+              <button class="ghost-btn" id="btnAddSchedule" style="grid-column: 1 / -1;">➕ إضافة جدولة</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: SETTINGS -->
+        <div class="pane" id="pane-settings">
+          <div class="box-card" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetLang">اللغة / Language</strong>
+              </div>
+              <select id="cfgLang" class="large-select-box" style="width: auto; padding: 6px 12px; font-size: 13px;">
+                <option value="ar">العربية (Arabic)</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetTheme">السمة / Theme</strong>
+              </div>
+              <select id="cfgTheme" class="large-select-box" style="width: auto; padding: 6px 12px; font-size: 13px;">
+                <option value="dark">داكن (Dark)</option>
+                <option value="light">فاتح (Light)</option>
+                <option value="ocean">محيط (Ocean)</option>
+                <option value="forest">غابة (Forest)</option>
+                <option value="sunset">غروب (Sunset)</option>
+                <option value="purple">بنفسجي (Purple)</option>
+                <option value="midnight">منتصف الليل (Midnight)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetWidgetStyle">تصميم نافذة الوقت</strong>
+                <p style="font-size: 11px; color: var(--muted);" id="lblSetWidgetStyleDesc">شكل نافذة الوقت الفعلي على حافة الشاشة</p>
+              </div>
+              <select id="cfgWidgetStyle" class="large-select-box" style="width: auto; padding: 6px 12px; font-size: 13px;">
+                <option value="cyber">⚡ نيون سايبر (Cyber Glass)</option>
+                <option value="pill">💊 كبسولة بسيطة (Minimal Pill)</option>
+                <option value="hud">🛰️ شاشة تكتيكية (Sci-Fi HUD)</option>
+                <option value="luxury">⏱️ فخامة ملكية (Luxury Chrono)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetCountdownStyle">تصميم عداد التنازلي</strong>
+                <p style="font-size: 11px; color: var(--muted);" id="lblSetCountdownStyleDesc">شكل شاشة العداد المنبثقة أعلى الشاشة</p>
+              </div>
+              <select id="cfgCountdownStyle" class="large-select-box" style="width: auto; padding: 6px 12px; font-size: 13px;">
+                <option value="hud">📊 شريط HUD علوي (HUD Bar)</option>
+                <option value="island">⭕ حلقة دائرية (Dynamic Island)</option>
+                <option value="reactor">🔋 مفاعل طاقة (Cyber Reactor)</option>
+                <option value="pill">🫧 كبسولة زجاجية (Glass Pill)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetSounds">الأصوات</strong>
+                <p style="font-size: 11px; color: var(--muted);">تنبيه صوتي عند اقتراب انتهاء العداد</p>
+              </div>
+              <input type="checkbox" id="cfgSounds" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetConfirm">تأكيد قبل التنفيذ</strong>
+                <p style="font-size: 11px; color: var(--muted);">إظهار نافذة تأكيد قبل الأوامر الفورية</p>
+              </div>
+              <input type="checkbox" id="cfgConfirm" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetForce">فرض الإيقاف (/f)</strong>
+                <p style="font-size: 11px; color: var(--muted);">إغلاق البرامج بالقوة</p>
+              </div>
+              <input type="checkbox" id="cfgForce" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetWarn">التنبيه قبل التنفيذ (ثانية)</strong>
+                <p style="font-size: 11px; color: var(--muted);">إشعار صوتي ومنبثق قبل انتهاء العداد بهذه المدة</p>
+              </div>
+              <input type="number" id="cfgWarnBefore" min="0" max="600" value="30" class="large-select-box" style="width: 80px; padding: 6px; font-size: 13px; color: var(--text);" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetStats">إظهار إحصائيات العتاد</strong>
+                <p style="font-size: 11px; color: var(--muted);">شريط المعالج والذاكرة في الأعلى</p>
+              </div>
+              <input type="checkbox" id="cfgShowStats" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetAutostart">التشغيل مع ويندوز</strong>
+                <p style="font-size: 11px; color: var(--muted);">بدء التطبيق تلقائيًا عند تسجيل الدخول</p>
+              </div>
+              <input type="checkbox" id="cfgAutoStart" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;" id="lblSetStartMinimized">بدء مصغراً في صينية النظام</strong>
+                <p style="font-size: 11px; color: var(--muted);" id="lblSetStartMinimizedDesc">إخفاء الواجهة الرئيسية عند الإقلاع وإظهار نافذة الوقت فقط</p>
+              </div>
+              <input type="checkbox" id="cfgStartMinimized" style="width: 18px; height: 18px;" />
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong style="font-size: 13px;">HTTPS <span id="httpsAvailBadge" class="secure-badge off">—</span></strong>
+                <p style="font-size: 11px; color: var(--muted);" id="lblSetHttps">
+                  تشفير الاتصال بخادم الجوال (يظهر تحذير شهادة بالجوال أول مرة — طبيعي)
+                </p>
+              </div>
+              <input type="checkbox" id="cfgHttps" style="width: 18px; height: 18px;" />
+            </div>
+          </div>
+
+          <div class="version-footer" id="versionFooter" title="حول البرنامج / About">v—</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div class="modal-backdrop" id="confirmModal">
+    <div class="modal-dialog">
+      <h3 style="font-size: 16px; font-weight: 700;" id="modalTitle">تأكيد العملية</h3>
+      <p style="font-size: 13px; color: var(--muted);" id="modalBody">هل أنت متأكد من رغبتك في تنفيذ هذا الإجراء؟</p>
+      <div class="modal-cmd" id="modalCmdDisplay">shutdown.exe /s /t 0</div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+        <button class="ghost-btn" id="modalCancel">إلغاء</button>
+        <button class="ghost-btn danger" id="modalConfirm">تأكيد وتنفيذ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARN Technology About Modal (Rules 1 & 2) -->
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="about-dialog">
+      <button class="about-close-btn" id="btnAboutClose" title="إغلاق">
+        <span id="aboutCloseIcon"></span>
+      </button>
+
+      <div class="about-brand-box">
+        <div class="about-logo-wrapper">
+          <img src="assets/icons/logo.png" alt="ARN Technology" onerror="this.style.display='none'; document.getElementById('aboutFallbackLogo').style.display='flex';" />
+          <div id="aboutFallbackLogo" style="display: none; align-items: center; justify-content: center; width: 100%; height: 100%;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+          </div>
+        </div>
+        <h2 class="about-title" id="aboutDialogTitle">ARN - Shutdown Panel</h2>
+        <span class="about-version-tag" id="aboutVersionTag">v2.0</span>
+      </div>
+
+      <p class="about-desc" id="aboutDesc">
+        لوحة تحكم احترافية لجدولة وإيقاف تشغيل النظام والتحكم به عن بعد بأعلى درجات الأمان والسرعة.
+      </p>
+
+      <div class="about-credits-card">
+        <div class="about-developer" id="aboutDeveloper">تطوير وبرمجة: عبده رجب نصار</div>
+        <div class="about-copyright" id="aboutCopyright">حقوق النشر (c) 2026 لشركة ARN Technology. جميع الحقوق محفوظة.</div>
+      </div>
+
+      <div class="about-social-row">
+        <button class="about-social-btn" id="btnSocialWhatsApp" title="WhatsApp" data-url="https://wa.me/201556710314">
+          <img src="assets/icons/whatsapp.png" alt="WhatsApp" />
+        </button>
+        <button class="about-social-btn" id="btnSocialTelegram" title="Telegram" data-url="https://t.me/ABDOURNASSAR95">
+          <img src="assets/icons/telegram.png" alt="Telegram" />
+        </button>
+        <button class="about-social-btn" id="btnSocialFacebook" title="Facebook" data-url="https://www.facebook.com/abdouragab.nassar">
+          <img src="assets/icons/facebook.png" alt="Facebook" />
+        </button>
+        <button class="about-social-btn" id="btnSocialMessenger" title="Messenger" data-url="https://m.me/abdouragab.nassar">
+          <img src="assets/icons/messenger.png" alt="Messenger" />
+        </button>
+      </div>
+
+      <button class="ghost-btn" id="btnAboutOk" style="min-width: 120px; justify-content: center; margin-top: 6px;">
+        إغلاق
+      </button>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="i18n.js"></script>
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

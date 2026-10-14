@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARN Remote Lock Screen</title>
+  <link rel="stylesheet" href="themes.css">
+  <link rel="stylesheet" href="fonts.css">
+  <style>
+    /* ===================== BUNDLED LOCAL FONTS ===================== */
+    @font-face {
+      font-family: "Tajawal";
+      src: url("fonts/tajawal-arabic-400.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Tajawal";
+      src: url("fonts/tajawal-arabic-500.woff2") format("woff2");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Tajawal";
+      src: url("fonts/tajawal-arabic-700.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Outfit";
+      src: url("fonts/outfit-latin-ext.woff2") format("woff2");
+      font-weight: 300 800;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Outfit";
+      src: url("fonts/outfit-latin.woff2") format("woff2");
+      font-weight: 300 800;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Cairo";
+      src: url("fonts/cairo-arabic.woff2") format("woff2");
+      font-weight: 200 1000;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    /* ===================== GLOBAL RESET ===================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-app-region: no-drag !important;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #030712;
+      color: #e2e8f0;
+      font-family: "Tajawal", "Outfit", "Cairo", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      -webkit-app-region: no-drag !important;
+    }
+
+    /* ===================== COSMIC BACKGROUND ===================== */
+
+    /* Deep-space base gradient */
+    .cosmos-bg {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(88, 28, 135, 0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 20%, rgba(30, 64, 175, 0.14) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 85%, rgba(6, 95, 70, 0.08) 0%, transparent 55%),
+        linear-gradient(180deg, #030712 0%, #0a0f1e 50%, #030712 100%);
+      z-index: 0;
+    }
+
+    /* Animated nebula clouds */
+    .nebula {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.55;
+      pointer-events: none;
+    }
+
+    .nebula-cloud {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      will-change: transform;
+      animation: nebulaDrift 20s ease-in-out infinite alternate;
+    }
+
+    .nebula-cloud:nth-child(1) {
+      width: 650px;
+      height: 650px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.22) 0%, transparent 70%);
+      top: 5%;
+      left: 10%;
+      animation-duration: 28s;
+    }
+    .nebula-cloud:nth-child(2) {
+      width: 550px;
+      height: 550px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
+      top: 35%;
+      right: 5%;
+      animation-duration: 22s;
+      animation-delay: -6s;
+    }
+    .nebula-cloud:nth-child(3) {
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.12) 0%, transparent 70%);
+      bottom: 8%;
+      left: 35%;
+      animation-duration: 24s;
+      animation-delay: -12s;
+    }
+    .nebula-cloud:nth-child(4) {
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.10) 0%, transparent 70%);
+      top: 60%;
+      left: 5%;
+      animation-duration: 26s;
+      animation-delay: -4s;
+    }
+
+    @keyframes nebulaDrift {
+      0%   { transform: translate(0, 0) scale(1); }
+      33%  { transform: translate(35px, -25px) scale(1.06); }
+      66%  { transform: translate(-25px, 18px) scale(0.94); }
+      100% { transform: translate(18px, -12px) scale(1.03); }
+    }
+
+    /* Twinkling stars layer */
+    .stars-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .star {
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+      animation: twinkle var(--dur) ease-in-out infinite;
+      animation-delay: var(--delay);
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: var(--oMin, 0.08); transform: scale(0.7); }
+      50%      { opacity: var(--oMax, 0.75); transform: scale(1.3); }
+    }
+
+    /* Shooting stars */
+    .shooting-star {
+      position: absolute;
+      height: 1.5px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.85), rgba(167,139,250,0.4), transparent);
+      border-radius: 1px;
+      animation: shoot var(--sDur, 14s) linear infinite;
+      animation-delay: var(--sDelay, 0s);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes shoot {
+      0%  { transform: translateX(-120px) translateY(0) rotate(-30deg); opacity: 0; width: 80px; }
+      1%  { opacity: 0.9; }
+      4%  { transform: translateX(calc(100vw + 150px)) translateY(250px) rotate(-30deg); opacity: 0; width: 140px; }
+      100%{ opacity: 0; }
+    }
+
+    /* Subtle scan-line overlay for CRT feel */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.025) 2px,
+        rgba(0, 0, 0, 0.025) 4px
+      );
+    }
+
+    /* ===================== LOCK CARD ===================== */
+
+    .lock-card {
+      position: relative;
+      z-index: 10;
+      width: 92%;
+      max-width: 540px;
+      background: rgba(15, 23, 42, 0.52);
+      backdrop-filter: blur(28px) saturate(1.5);
+      -webkit-backdrop-filter: blur(28px) saturate(1.5);
+      border: 1px solid rgba(148, 163, 184, 0.10);
+      border-radius: 26px;
+      padding: 34px 38px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow:
+        0 30px 70px rgba(0, 0, 0, 0.55),
+        0 0 1px rgba(148, 163, 184, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    /* Neon shimmer top border */
+    .lock-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #8b5cf6, #6366f1, #3b82f6, #22d3ee, #3b82f6, #6366f1, #8b5cf6);
+      background-size: 300% 100%;
+      animation: shimmerBorder 5s linear infinite;
+      border-radius: 26px 26px 0 0;
+    }
+
+    @keyframes shimmerBorder {
+      0%   { background-position: 300% 0; }
+      100% { background-position: -300% 0; }
+    }
+
+    /* Soft inner radial glow */
+    .lock-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 120px;
+      background: radial-gradient(ellipse, rgba(139, 92, 246, 0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* ===================== SHIELD EMBLEM ===================== */
+
+    .shield-wrap {
+      position: relative;
+      margin-bottom: 10px;
+      z-index: 1;
+    }
+
+    .shield-ring {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(139, 92, 246, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow:
+        0 0 22px rgba(139, 92, 246, 0.3),
+        inset 0 0 18px rgba(139, 92, 246, 0.1);
+      animation: shieldPulse 3.5s ease-in-out infinite;
+    }
+
+    .shield-ring svg {
+      color: #a78bfa;
+      filter: drop-shadow(0 0 10px rgba(167, 139, 250, 0.55));
+    }
+
+    /* Orbiting dashed ring */
+    .shield-ring::before {
+      content: '';
+      position: absolute;
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      border: 1.5px dashed rgba(139, 92, 246, 0.22);
+      animation: orbit 14s linear infinite;
+    }
+
+    /* Secondary outer glow ring */
+    .shield-ring::after {
+      content: '';
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 1px solid rgba(99, 102, 241, 0.08);
+      animation: orbit 20s linear infinite reverse;
+    }
+
+    @keyframes orbit {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    @keyframes shieldPulse {
+      0%, 100% { box-shadow: 0 0 18px rgba(139, 92, 246, 0.22), inset 0 0 14px rgba(139, 92, 246, 0.06); }
+      50%      { box-shadow: 0 0 32px rgba(139, 92, 246, 0.45), inset 0 0 22px rgba(139, 92, 246, 0.14); }
+    }
+
+    .brand-label {
+      font-size: 11px;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    /* ===================== DIGITAL CLOCK ===================== */
+
+    .clock-section {
+      margin: 8px 0 16px;
+      z-index: 1;
+    }
+
+    .time-row {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      direction: ltr;
+    }
+
+    .time-text {
+      font-family: "Outfit", sans-serif;
+      font-size: 5rem;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -1.5px;
+      line-height: 1;
+      text-shadow: 0 2px 24px rgba(255, 255, 255, 0.25);
+      direction: ltr;
+    }
+
+    /* خانة الثواني المخصصة (Seconds Box) */
+    .seconds-box {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1.5px solid rgba(139, 92, 246, 0.45);
+      border-radius: 12px;
+      padding: 5px 12px;
+      min-width: 52px;
+      box-shadow: 0 0 18px rgba(139, 92, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .seconds-digits {
+      font-family: "Outfit", sans-serif;
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #c4b5fd;
+      line-height: 1;
+      letter-spacing: 0.5px;
+      text-shadow: 0 0 12px rgba(196, 181, 253, 0.45);
+    }
+
+    .seconds-label {
+      font-family: "Outfit", "Tajawal", sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 3px;
+      line-height: 1;
+    }
+
+    /* مؤشر صباحاً / مساءً */
+    .period-tag {
+      font-family: "Outfit", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff;
+      background: rgba(99, 102, 241, 0.22);
+      border: 1.5px solid rgba(99, 102, 241, 0.45);
+      border-radius: 12px;
+      padding: 12px 14px;
+      letter-spacing: 1.5px;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .date-line {
+      font-family: "Tajawal", sans-serif;
+      font-size: 14px;
+      color: #94a3b8;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    /* ===================== STATUS PILL ===================== */
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(239, 68, 68, 0.10);
+      border: 1px solid rgba(239, 68, 68, 0.28);
+      padding: 6px 20px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fca5a5;
+      margin-bottom: 18px;
+      z-index: 1;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 12px #ef4444;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.25; transform: scale(0.65); }
+    }
+
+    /* ===================== ALERT / MESSAGE BOX ===================== */
+
+    .alert-box {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(245, 158, 11, 0.22);
+      border-right: 3px solid #f59e0b;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      text-align: right;
+      z-index: 1;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .alert-icon {
+      font-size: 18px;
+      line-height: 1.3;
+      flex-shrink: 0;
+    }
+
+    .alert-content {
+      flex: 1;
+    }
+
+    .alert-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .alert-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    /* ===================== UNLOCK FORM ===================== */
+
+    .unlock-form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 1;
+    }
+
+    .input-row {
+      display: flex;
+      width: 100%;
+      gap: 8px;
+    }
+
+    .glass-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1.5px solid rgba(148, 163, 184, 0.14);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #f8fafc;
+      outline: none;
+      transition: all 0.25s ease;
+      font-family: "Cairo", sans-serif;
+    }
+
+    .glass-input:focus {
+      border-color: rgba(139, 92, 246, 0.50);
+      box-shadow: 0 0 22px rgba(139, 92, 246, 0.20), inset 0 0 12px rgba(139, 92, 246, 0.04);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .glass-input::placeholder {
+      color: #475569;
+    }
+
+    .btn-unlock {
+      background: linear-gradient(135deg, #7c3aed, #6366f1, #3b82f6);
+      background-size: 200% 200%;
+      animation: gradientFlow 5s ease infinite;
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-family: "Cairo", sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 12px 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 5px 22px rgba(124, 58, 237, 0.35);
+      transition: all 0.25s ease;
+      white-space: nowrap;
+    }
+
+    @keyframes gradientFlow {
+      0%, 100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+
+    .btn-unlock:hover {
+      box-shadow: 0 8px 30px rgba(124, 58, 237, 0.55);
+      transform: translateY(-2px);
+    }
+
+    .btn-unlock:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 12px rgba(124, 58, 237, 0.30);
+    }
+
+    /* ===================== ERROR SHAKE ===================== */
+
+    .shake {
+      animation: shakeAnim 0.45s ease-in-out;
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 22px rgba(239, 68, 68, 0.35) !important;
+    }
+
+    @keyframes shakeAnim {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .error-msg {
+      font-size: 12px;
+      font-weight: 600;
+      color: #f87171;
+      min-height: 18px;
+      transition: opacity 0.2s;
+    }
+
+    /* ===================== REMOTE HINT ===================== */
+
+    .remote-hint {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 1;
+    }
+
+    .remote-hint strong {
+      color: #a78bfa;
+    }
+
+    /* ===================== FOOTER ===================== */
+
+    .lock-footer {
+      position: absolute;
+      bottom: 22px;
+      text-align: center;
+      z-index: 10;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.7;
+    }
+
+    .dev-badge {
+      color: #10b981;
+      font-weight: 700;
+    }
+
+    /* ===================== TRANSITIONS ===================== */
+
+    /* Unlock success fade-out */
+    .fade-out {
+      opacity: 0;
+      transform: scale(0.92);
+      transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Card entry animation */
+    @keyframes cardEntrance {
+      0%   { opacity: 0; transform: translateY(30px) scale(0.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .lock-card {
+      animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    /* Footer entry */
+    @keyframes fadeInUp {
+      0%   { opacity: 0; transform: translateY(12px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .lock-footer {
+      animation: fadeInUp 0.7s 0.3s ease both;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== COSMIC BACKGROUND ==================== -->
+  <div class="cosmos-bg"></div>
+
+  <div class="nebula">
+    <div class="nebula-cloud"></div>
+    <div class="nebula-cloud"></div>
+    <div class="nebula-cloud"></div>
+    <div class="nebula-cloud"></div>
+  </div>
+
+  <div class="stars-layer" id="starsLayer"></div>
+
+  <div class="scanlines"></div>
+
+  <!-- ==================== LOCK CARD ==================== -->
+  <div class="lock-card" id="lockCard">
+
+    <!-- Shield Emblem -->
+    <div class="shield-wrap">
+      <div class="shield-ring">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="M9 12l2 2 4-4"></path>
+        </svg>
+      </div>
+    </div>
+    <div class="brand-label">ARN TECHNOLOGY</div>
+
+    <!-- Digital Clock -->
+    <div class="clock-section">
+      <div class="time-row">
+        <div class="time-text" id="timeDigits">12:00</div>
+        <!-- خانة الثواني المخصصة -->
+        <div class="seconds-box" id="secondsBox" title="خانة الثواني">
+          <span class="seconds-digits" id="secondsDigits">00</span>
+          <span class="seconds-label">SEC</span>
+        </div>
+        <div class="period-tag" id="ampmBadge">PM</div>
+      </div>
+      <div class="date-line" id="dateText">جاري تحميل الوقت...</div>
+    </div>
+
+    <!-- Lock Status Pill -->
+    <div class="status-pill">
+      <span class="pulse-dot"></span>
+      <span id="lockStatusTxt">الجهاز مقفل عن بعد — System Locked</span>
+    </div>
+
+    <!-- Owner Message Alert -->
+    <div class="alert-box">
+      <span class="alert-icon">🛡️</span>
+      <div class="alert-content">
+        <div class="alert-label">رسالة المالك:</div>
+        <div class="alert-text" id="customMsgText">الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب</div>
+      </div>
+    </div>
+
+    <!-- Local Unlock Form -->
+    <form class="unlock-form" id="unlockForm" onsubmit="handleLocalUnlock(event)">
+      <div class="input-row">
+        <input
+          type="password"
+          id="unlockPassword"
+          class="glass-input"
+          placeholder="أدخل كلمة المرور لفك القفل..."
+          autocomplete="off"
+          autofocus
+        />
+        <button type="submit" class="btn-unlock" id="btnUnlock">
+          <span>فك القفل</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="error-msg" id="errorMsg"></div>
+    </form>
+
+    <div class="remote-hint">
+      <span>📱</span>
+      <span>يمكنك أيضاً فك القفل مباشرة بنقرة واحدة من <strong>تطبيق الجوال</strong>.</span>
+    </div>
+  </div>
+
+  <!-- Footer Branding -->
+  <div class="lock-footer">
+    <div>حقوق النشر &copy; 2026 لشركة ARN Technology. جميع الحقوق محفوظة.</div>
+    <div>تطوير وبرمجة: <span class="dev-badge">عبده رجب نصار</span></div>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script>
+    // ===================== STAR FIELD GENERATOR =====================
+    (function generateCosmicStars() {
+      const layer = document.getElementById('starsLayer');
+      const STAR_COUNT = 140;
+
+      for (let i = 0; i < STAR_COUNT; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        const size = Math.random() * 2.2 + 0.4;
+        star.style.width = size + 'px';
+        star.style.height = size + 'px';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.setProperty('--dur', (Math.random() * 4.5 + 2) + 's');
+        star.style.setProperty('--delay', (Math.random() * 6) + 's');
+        star.style.setProperty('--oMin', (Math.random() * 0.15).toFixed(2));
+        star.style.setProperty('--oMax', (Math.random() * 0.5 + 0.3).toFixed(2));
+        layer.appendChild(star);
+      }
+
+      // Shooting stars (CSS-driven for performance)
+      for (let i = 0; i < 3; i++) {
+        const shoot = document.createElement('div');
+        shoot.className = 'shooting-star';
+        shoot.style.top = (Math.random() * 35 + 5) + '%';
+        shoot.style.left = (Math.random() * 15) + '%';
+        shoot.style.setProperty('--sDelay', (i * 9 + Math.random() * 5) + 's');
+        shoot.style.setProperty('--sDur', (14 + Math.random() * 10) + 's');
+        layer.appendChild(shoot);
+      }
+    })();
+
+    // ===================== LIVE CLOCK (12-HOUR) =====================
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      const isPM = hours >= 12;
+      hours = hours % 12 || 12;
+      const h = String(hours).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+
+      const timeEl = document.getElementById('timeDigits');
+      if (timeEl) timeEl.textContent = `${h}:${m}`;
+
+      const secEl = document.getElementById('secondsDigits');
+      if (secEl) secEl.textContent = s;
+
+      const ampmEl = document.getElementById('ampmBadge');
+      if (ampmEl) ampmEl.textContent = isPM ? 'PM' : 'AM';
+
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const dateEl = document.getElementById('dateText');
+      if (dateEl) dateEl.textContent = now.toLocaleDateString('ar-EG', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ===================== PYTHON API BRIDGE =====================
+
+    // Called by Python to set the lock message and reset the form
+    window.setLockInfo = function(data) {
+      if (data && data.message) {
+        document.getElementById('customMsgText').textContent = data.message;
+      }
+      const pwdInput = document.getElementById('unlockPassword');
+      if (pwdInput) {
+        pwdInput.value = '';
+        pwdInput.classList.remove('shake');
+        pwdInput.focus();
+      }
+      document.getElementById('errorMsg').textContent = '';
+      document.getElementById('lockCard').classList.remove('fade-out');
+    };
+
+    // Called by Python after successful remote unlock
+    window.onUnlockSuccess = function() {
+      document.getElementById('lockCard').classList.add('fade-out');
+    };
+
+    // ===================== LOCAL UNLOCK HANDLER =====================
+    async function handleLocalUnlock(e) {
+      if (e) e.preventDefault();
+      const pwdInput = document.getElementById('unlockPassword');
+      const errEl = document.getElementById('errorMsg');
+      const val = pwdInput.value.trim();
+
+      errEl.textContent = '';
+      pwdInput.classList.remove('shake');
+
+      if (!val) {
+        errEl.textContent = 'يرجى كتابة كلمة المرور';
+        pwdInput.classList.add('shake');
+        return;
+      }
+
+      try {
+        if (window.pywebview && window.pywebview.api) {
+          const res = await window.pywebview.api.unlock_screen(val);
+          if (res && res.ok) {
+            window.onUnlockSuccess();
+          } else {
+            errEl.textContent = (res && res.error) ? res.error : 'كلمة المرور غير صحيحة';
+            pwdInput.classList.add('shake');
+            pwdInput.select();
+          }
+        } else {
+          // Dev preview fallback
+          if (val === 'admin') {
+            window.onUnlockSuccess();
+          } else {
+            errEl.textContent = 'كلمة المرور غير صحيحة';
+            pwdInput.classList.add('shake');
+          }
+        }
+      } catch (err) {
+        errEl.textContent = 'حدث خطأ أثناء فك القفل';
+        pwdInput.classList.add('shake');
+      }
+    }
+
+    // ===================== SECURITY HARDENING =====================
+
+    // Keep focus on the password input even if user clicks away
+    window.addEventListener('blur', () => {
+      setTimeout(() => {
+        window.focus();
+        const pwdInput = document.getElementById('unlockPassword');
+        if (pwdInput) pwdInput.focus();
+      }, 80);
+    });
+
+    // Suppress context menu & dangerous keyboard shortcuts
+    window.addEventListener('contextmenu', e => e.preventDefault());
+    window.addEventListener('keydown', e => {
+      if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.altKey && e.key === 'F4')) {
+        e.preventDefault();
+      }
+    });
+
+    // Auto-focus the password input on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const pwdInput = document.getElementById('unlockPassword');
+      if (pwdInput) pwdInput.focus();
+    });
+  </script>
+</body>
+</html>

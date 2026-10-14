@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shutdown Panel — Client</title>
+  <link rel="stylesheet" href="themes.css">
+  <style>
+    /* Local bundled fonts */
+    @font-face {
+      font-family: "Cairo";
+      src: url("fonts/cairo-arabic.woff2") format("woff2");
+      font-weight: 200 1000; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: "Outfit";
+      src: url("fonts/outfit-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: swap;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Cairo", system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+
+    * {
+      font-family: "Cairo", system-ui, -apple-system, sans-serif !important;
+    }
+
+    body {
+      display: flex;
+      flex-direction: row;
+      padding: 32px 0 0 0; /* padding for window drag bar */
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.3); border-radius: 99px; }
+
+    /* Glow utilities */
+    .cyan-glow {
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 8px 28px rgba(6, 182, 212, 0.28);
+    }
+    .danger-glow {
+      box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.35), 0 8px 28px rgba(251, 113, 133, 0.28);
+    }
+    .power-ring {
+      box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.35), 0 0 18px rgba(34, 211, 238, 0.35);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .power-ring:hover, .power-ring:active {
+      box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.7), 0 0 28px rgba(34, 211, 238, 0.55);
+      transform: scale(1.05);
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.3), 0 0 14px rgba(34, 211, 238, 0.25); }
+      50% { box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.7), 0 0 26px rgba(34, 211, 238, 0.55); }
+    }
+    .pulse-glow { animation: pulse-glow 2.2s ease-in-out infinite; }
+
+    @keyframes barber {
+      from { background-position: 0 0; }
+      to { background-position: 40px 0; }
+    }
+    .countdown-bar {
+      background-image: repeating-linear-gradient(
+        -45deg,
+        rgba(34, 211, 238, 0.95) 0 10px,
+        rgba(6, 182, 212, 0.7) 10px 20px
+      );
+      background-size: 40px 40px;
+      animation: barber 0.8s linear infinite;
+    }
+
+    /* Top Title Bar */
+    .top-bar {
+      background: var(--panel-2);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      margin-bottom: 10px;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px 20px 16px;
+      border-bottom: 1px solid var(--stroke);
+      margin-bottom: 10px;
+    }
+    .brand-logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(34, 211, 238, 0.15);
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--cyan);
+      font-size: 20px;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--cyan);
+      line-height: 1.1;
+    }
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status-badge {
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--ok);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+    }
+    .status-badge.bad {
+      background: rgba(251, 113, 133, 0.15);
+      color: var(--danger);
+      border-color: rgba(251, 113, 133, 0.3);
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      transition: all 0.15s;
+    }
+    .icon-btn:hover, .icon-btn:active {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-color: var(--cyan);
+    }
+
+    /* Server Pills */
+    .stats-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .server-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .server-indicator-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--panel-2) 80%, #000);
+      border: none;
+      color: var(--cyan);
+      font-size: 14px;
+    }
+
+    /* Horizontal Tabs Bar */
+    .tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 2px 2px 6px 2px;
+      scrollbar-width: none;
+    }
+    .tabs-bar::-webkit-scrollbar { display: none; }
+
+    .tab-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 9999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--muted);
+      background: var(--panel-2);
+      border: 1px solid var(--stroke);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tab-pill:hover, .tab-pill:active {
+      color: var(--text);
+      border-color: rgba(34, 211, 238, 0.4);
+    }
+    .tab-pill.active {
+      background: var(--cyan);
+      color: #070c16;
+      border-color: var(--cyan);
+      box-shadow: 0 6px 20px rgba(34, 211, 238, 0.35);
+    }
+
+    /* Card Boxes */
+    .box-card {
+      background: var(--panel-2);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+    }
+    .card-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Inputs Grid */
+    .inputs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .field-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .large-select-box {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--cyan);
+      font-size: 15px;
+      font-weight: 700;
+      width: 100%;
+      cursor: pointer;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .large-select-box:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.25);
+    }
+
+    /* Status Box */
+    .status-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      min-height: 70px;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* Action Pills */
+    .action-pills-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .action-pill-btn {
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .action-pill-btn.active {
+      background: rgba(34, 211, 238, 0.18);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Big Start/Cancel Button */
+    .btn-big-start {
+      width: 100%;
+      padding: 12px 20px;
+      border-radius: 9999px;
+      border: 1.5px solid rgba(34, 211, 238, 0.55);
+      background: transparent;
+      color: var(--cyan);
+      font-size: 15.5px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+    .btn-big-start:active { transform: scale(0.98); }
+    .btn-big-start.btn-running {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* Presets Row */
+    .presets-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .preset-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover, .preset-btn:active {
+      background: rgba(34, 211, 238, 0.12);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Ghost Button */
+    .ghost-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .ghost-btn:hover, .ghost-btn:active {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--cyan);
+    }
+    .ghost-btn.danger {
+      color: var(--danger);
+      border-color: rgba(251, 113, 133, 0.35);
+    }
+    .ghost-btn.danger:hover, .ghost-btn.danger:active {
+      background: rgba(251, 113, 133, 0.15);
+      border-color: var(--danger);
+    }
+
+    /* Action / Lock Buttons */
+    .action-btn {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      color: #fff;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .action-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+    .action-btn.btn-lock {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    }
+    .action-btn.btn-unlock {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+      animation: pulse-glow 1.5s infinite;
+    }
+
+    /* Action Tiles Grid */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .action-tile {
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .action-tile:active {
+      transform: scale(0.96);
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+    }
+    .action-tile .tile-icon {
+      font-size: 24px;
+      color: var(--cyan);
+      filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.4));
+    }
+    .action-tile .tile-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .action-tile.danger .tile-icon { color: var(--danger); filter: drop-shadow(0 0 6px rgba(251, 113, 133, 0.4)); }
+    .action-tile.danger:active { border-color: var(--danger); background: rgba(251, 113, 133, 0.1); }
+
+    /* Trackpad Box */
+    .trackpad-box {
+      width: 100%;
+      height: clamp(260px, 42vh, 420px);
+      background: radial-gradient(circle at center, #101c30 0%, #080f1e 100%);
+      border: 2px dashed rgba(34, 211, 238, 0.3);
+      border-radius: 18px;
+      position: relative;
+      touch-action: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: crosshair;
+      overflow: hidden;
+      box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.6);
+    }
+    .trackpad-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      pointer-events: none;
+      text-align: center;
+      line-height: 1.8;
+    }
+    .scroll-strip {
+      width: 38px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border-inline-start: 1px solid var(--stroke);
+      position: absolute;
+      inset-inline-end: 0;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--cyan);
+      touch-action: none;
+    }
+
+    /* Screen Stream */
+    .screen-wrapper {
+      width: 100%;
+      background: #000;
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      overflow: hidden;
+      position: relative;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .screen-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+    .empty-hint {
+      text-align: center;
+      padding: 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* Drives and Files */
+    .drives-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+    .drive-card {
+      background: linear-gradient(145deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      min-width: 80px;
+      transition: all 0.2s;
+    }
+    .drive-card:active { transform: scale(0.95); border-color: var(--cyan); }
+    .drive-icon { width: 32px; height: 32px; color: var(--cyan); filter: drop-shadow(0 2px 4px rgba(34, 211, 238, 0.4)); }
+    .drive-card span { font-size: 1.1rem; font-weight: 800; color: var(--text); }
+    .breadcrumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--panel);
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      direction: ltr;
+      word-break: break-all;
+    }
+    .breadcrumb-item { color: var(--cyan); cursor: pointer; text-decoration: underline; }
+    .files-list { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+      gap: 12px; 
+      max-height: 400px; 
+      overflow-y: auto; 
+      padding: 4px;
+    }
+    .file-card {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 16px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .file-card-opts {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .file-card:active {
+      transform: scale(0.95);
+      border-color: var(--cyan);
+      background: rgba(34, 211, 238, 0.08);
+    }
+    .file-card-icon {
+      font-size: 42px;
+      line-height: 1;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    }
+    .file-card-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text);
+      direction: ltr;
+      word-break: break-all;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-card-size {
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    /* Range Sliders */
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    .slider-row input[type="range"] {
+      flex: 1;
+      height: 6px;
+      background: var(--panel);
+      border-radius: 99px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--cyan);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-top: 1px solid var(--stroke);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .sidebar {
+      width: 200px;
+      background: var(--panel-2);
+      border-left: 1px solid var(--stroke);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 0;
+      gap: 12px;
+      z-index: 1000;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .main-content {
+      flex: 1;
+      height: 100%;
+      overflow-y: auto;
+      padding: 20px 30px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.62rem;
+      font-weight: 700;
+      gap: 3px;
+      flex: 1;
+      padding: 10px 0 6px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .nav-svg {
+      width: 24px;
+      height: 24px;
+      margin-bottom: 2px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-item.active {
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(34, 211, 238, 0.4);
+    }
+    .nav-item.active .nav-svg {
+      stroke: var(--cyan);
+      fill: rgba(34, 211, 238, 0.15);
+      transform: translateY(-4px) scale(1.15);
+      filter: drop-shadow(0 4px 10px rgba(34, 211, 238, 0.5));
+    }
+    
+    .ui-icon {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      vertical-align: middle;
+      display: inline-block;
+    }
+
+    .tab-pane {
+      display: none !important;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .tab-pane.active {
+      display: flex !important;
+    }
+    .tab-pane.active.desktop-grid-2 {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+    }
+    .tab-pane.active.desktop-grid-3 {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(12, 20, 36, 0.96);
+      border: 1px solid var(--cyan);
+      border-inline-start: 4px solid var(--cyan);
+      padding: 9px 18px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      z-index: 3500;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      display: none;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--panel-2);
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      padding: 18px;
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    }
+    .modal h3 { font-size: 1rem; color: var(--text); font-weight: 800; }
+    .modal p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+
+    /* ---- Connection Screen ---- */
+    #connectionScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 30px;
+    }
+    #connectionScreen.hidden { display: none; }
+    .conn-logo {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: rgba(34, 211, 238, 0.12);
+      border: 2px solid rgba(34, 211, 238, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--cyan);
+      animation: pulse-glow 2.2s ease-in-out infinite;
+    }
+    .conn-title { font-size: 1.4rem; font-weight: 800; color: var(--text); }
+    .conn-subtitle { font-size: 0.85rem; color: var(--muted); text-align: center; }
+    .conn-scanning {
+      font-size: 0.8rem; color: var(--cyan);
+      display: flex; align-items: center; gap: 8px;
+    }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--stroke); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .servers-list {
+      display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 360px;
+    }
+    .server-card {
+      background: var(--panel-2); border: 1px solid var(--stroke); border-radius: 14px;
+      padding: 14px 18px; display: flex; align-items: center; gap: 14px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .server-card:hover, .server-card:active { border-color: var(--cyan); transform: scale(1.02); }
+    .server-card-icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(34, 211, 238, 0.12); display: flex; align-items: center; justify-content: center; color: var(--cyan); }
+    .server-card-info { flex: 1; }
+    .server-card-name { font-size: 0.92rem; font-weight: 700; color: var(--text); }
+    .server-card-ip { font-size: 0.72rem; color: var(--muted); direction: ltr; }
+    .conn-manual-toggle { font-size: 0.78rem; color: var(--cyan); cursor: pointer; text-decoration: underline; margin-top: 8px; }
+    .conn-manual-form {
+      width: 100%; max-width: 360px; display: none; flex-direction: column; gap: 10px;
+    }
+    .conn-manual-form.open { display: flex; }
+    .conn-input {
+      background: var(--panel); border: 1px solid var(--stroke); border-radius: 12px;
+      padding: 10px 14px; color: var(--text); font-size: 0.9rem; width: 100%; outline: none;
+    }
+    .conn-input:focus { border-color: var(--cyan); }
+    .conn-btn {
+      background: transparent; border: 1.5px solid var(--cyan); color: var(--cyan);
+      padding: 10px 20px; border-radius: 9999px; font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .conn-btn:hover { background: rgba(34, 211, 238, 0.12); }
+
+    /* Desktop frameless window title bar */
+    .window-drag-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 32px;
+      -webkit-app-region: drag;
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 8px; z-index: 9998;
+    }
+    .window-drag-bar button {
+      -webkit-app-region: no-drag;
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .window-drag-bar button:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+    .window-drag-bar .btn-close-win:hover { background: rgba(251,113,133,0.3); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="window-drag-bar">
+    <button onclick="pywebview.api.minimize_window()" title="تصغير">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
+    <button onclick="pywebview.api.toggle_fullscreen()" title="تكبير">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+    </button>
+    <button class="btn-close-win" onclick="pywebview.api.close_window()" title="إغلاق">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  </div>
+
+  <!-- Connection / Discovery Screen -->
+  <div id="connectionScreen">
+    <div class="conn-logo">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+    </div>
+    <div class="conn-title">Shutdown Panel Client</div>
+    <div class="conn-subtitle">جارٍ البحث عن أجهزة على الشبكة المحلية...</div>
+    <div class="conn-scanning"><div class="spinner"></div> <span>يبحث...</span></div>
+    <div class="servers-list" id="serversList"></div>
+    <div class="conn-manual-toggle" onclick="toggleManualConnect()">اتصال يدوي</div>
+    <div class="conn-manual-form" id="manualForm">
+      <input class="conn-input" id="manualIp" placeholder="عنوان IP (مثال: 192.168.1.100)" dir="ltr">
+      <input class="conn-input" id="manualPort" placeholder="المنفذ (مثال: 8080)" dir="ltr" value="8080">
+      <input class="conn-input" id="manualToken" placeholder="رمز الدخول (Token)" dir="ltr">
+      <button class="conn-btn" onclick="manualConnect()">اتصال</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- General Confirm Modal -->
+  <div class="modal-backdrop" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle">تأكيد العملية</h3>
+      <p id="confirmBody">هل أنت متأكد من رغبتك في التنفيذ؟</p>
+      <div class="grid-2">
+        <button class="ghost-btn" id="confirmNo">إلغاء</button>
+        <button class="ghost-btn danger" id="confirmYes">تأكيد وتنفيذ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Action Modal -->
+  <div class="modal-backdrop" id="fileActionModal">
+    <div class="modal">
+      <h3 style="display:flex;align-items:center;gap:8px" id="fileModalIconTitle">
+        <span>📄</span> <span id="fileModalName" style="direction:ltr;word-break:break-all;font-size:0.88rem"></span>
+      </h3>
+      <p id="fileModalSize" style="font-size:0.75rem;color:var(--muted)"></p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <button class="ghost-btn" id="btnFileOpenPc" onclick="openFileOnPcSelected()">
+          <span>💻</span> <span data-i18n="openOnPc">تشغيل على الكمبيوتر</span>
+        </button>
+        <button class="ghost-btn" id="btnFileDownload" onclick="downloadFileSelected()">
+          <span>⬇️</span> <span data-i18n="downloadToPhone">تنزيل إلى الهاتف</span>
+        </button>
+        <div class="grid-2">
+          <button class="ghost-btn" id="btnFileRename" onclick="renameFileSelected()">✏️ <span data-i18n="rename">إعادة تسمية</span></button>
+          <button class="ghost-btn danger" id="btnFileDelete" onclick="deleteFileSelected()">🗑️ <span data-i18n="delete">حذف</span></button>
+        </div>
+        <button class="ghost-btn" onclick="closeFileActionModal()">✕ <span data-i18n="cancel">إلغاء</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar Nav -->
+  <div class="sidebar">
+    <div class="brand-section" style="margin-bottom: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--stroke);">
+      <div class="brand-logo-icon power-ring pulse-glow"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+      <div style="margin-top: 8px;">
+        <div class="brand-title">Shutdown Panel</div>
+        <div class="brand-subtitle" style="font-size:12px; color:var(--muted);">لوحة تحكم الديسكتوب</div>
+      </div>
+    </div>
+    <div class="nav-item active" onclick="switchTab('power', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      <span data-i18n="timer">المؤقت</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('quick', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      <span data-i18n="quick">سريعة</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('control', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><rect x="5" y="2" width="14" height="20" rx="7"></rect><line x1="12" y1="6" x2="12" y2="10"></line></svg>
+      <span data-i18n="control">التحكم</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('screen', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+      <span data-i18n="screen">الشاشة</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('files', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+      <span data-i18n="files">الملفات</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('media', this)">
+      <svg viewBox="0 0 24 24" class="nav-svg"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+      <span data-i18n="media">الوسائط</span>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="container">
+        <!-- Top Dashboard Bar -->
+    <div class="top-bar">
+      <div class="stats-info">
+        <div class="server-pill">
+          <button class="server-indicator-btn power-ring pulse-glow" onclick="sendPowerCmd('shutdown', 0)" title="إيقاف فوري"><svg viewBox="0 0 24 24" class="ui-icon" style="width:14px;height:14px"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg></button>
+          <span id="hostName" style="font-weight:700; color:var(--text);">…</span>
+        </div>
+        <div style="display:flex; gap:16px; align-items:center; font-weight:700;">
+          <span>RAM: <b id="ramVal" style="color:var(--text);">0%</b></span>
+          <span style="opacity:0.3;">|</span>
+          <span>CPU: <b id="cpuVal" style="color:var(--text);">0%</b></span>
+          <span id="battStat" style="display:none; color:var(--ok);"><svg viewBox="0 0 24 24" class="ui-icon" style="width:14px;height:14px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> <b id="battVal">0%</b></span>
+          <span id="topLockBadge" class="status-badge" style="display:none; cursor:pointer; background:rgba(239,68,68,0.2); color:#f87171; border-color:rgba(239,68,68,0.4);" onclick="switchTab('quick')">🔒 مقفل</span>
+        </div>
+      </div>
+      <div class="top-controls" style="display:flex; gap: 8px; align-items:center;">
+        <span class="status-badge" id="connStatus">متصل</span>
+        <button class="icon-btn" onclick="toggleTheme()" title="تغيير المظهر"><svg viewBox="0 0 24 24" class="ui-icon" style="width:16px;height:16px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
+        <button class="icon-btn" id="btnLangToggle" onclick="toggleLang()">EN</button>
+        <button class="icon-btn" onclick="logoutRemote()" title="خروج"><svg viewBox="0 0 24 24" class="ui-icon" style="width:16px;height:16px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
+      </div>
+    </div>
+
+    <!-- Login Card (If unauthenticated) -->
+    <div class="box-card" id="authCard" style="display:none">
+      <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> <span data-i18n="loginTitle">تسجيل الدخول</span></div>
+      <p style="font-size:0.78rem;color:var(--muted);" data-i18n="loginHelp">أدخل اسم المستخدم وكلمة المرور المسجلة في جهاز الكمبيوتر:</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input type="text" id="authUsername" class="large-select-box" style="text-align:start;" placeholder="admin" value="admin">
+        <input type="password" id="authPassword" class="large-select-box" style="text-align:start;" placeholder="••••••••">
+        <button class="btn-big-start cyan-glow" onclick="loginWithCredentials()"><span data-i18n="loginBtn">تسجيل الدخول والاتصال</span></button>
+      </div>
+    </div>
+
+    <!-- TAB 1: TIMER -->
+    <div class="tab-pane active desktop-grid-2" id="pane-power">
+      <!-- Card 1: Time Pickers -->
+      <div class="box-card">
+        <div class="card-title" style="justify-content:center;">
+          <span id="lblSetTime">ضبط وقت الإيقاف</span> <svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div class="inputs-grid">
+          <div class="field-group">
+            <label class="field-label" id="lblHours">ساعات</label>
+            <select class="large-select-box" id="selectHours"></select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" id="lblMinutes">دقائق</label>
+            <select class="large-select-box" id="selectMinutes"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Status / Countdown Box -->
+      <div class="box-card" id="statusCard">
+        <!-- Active Countdown State -->
+        <div id="runningCountdownBox" style="display:none; text-align:center; padding:10px 0;">
+          <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">
+            <span id="lblRemaining">الوقت المتبقي لإيقاف التشغيل</span>
+          </div>
+          <div id="cdDigitalTime" style="font-family:'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif; font-size:42px; font-weight:900; color:var(--cyan); letter-spacing:1.5px; text-shadow:0 0 16px rgba(34,211,238,0.75);">
+            00:00:00
+          </div>
+          <div style="width:100%; height:8px; background:rgba(255,255,255,0.06); border-radius:99px; overflow:hidden; margin:12px 0 10px;">
+            <div class="countdown-bar" id="cdProgressBar" style="width:100%; height:100%; border-radius:99px;"></div>
+          </div>
+          <div style="display:flex; justify-content:center; gap:8px; margin-top:6px;">
+            <button class="ghost-btn" id="btnPauseResume" onclick="togglePauseResume()">
+              <span id="cdPauseIcon"><svg viewBox="0 0 24 24" class="ui-icon"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></span> <span id="lblBtnPause">إيقاف مؤقت</span>
+            </button>
+          </div>
+        </div>
+
+        <button class="btn-big-start cyan-glow" id="btnDynamicTimer" onclick="handleDynamicTimerClick()">
+          <span id="boltIcon"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
+          <span id="lblStartBtn">بدء العداد</span>
+        </button>
+      </div>
+
+      <!-- Card 3: Quick Presets -->
+      <div class="box-card">
+        <div class="presets-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <button class="preset-btn" style="padding:14px; font-size:1.05rem;" onclick="startPreset(300)">5 دقائق</button>
+          <button class="preset-btn" style="padding:14px; font-size:1.05rem;" onclick="startPreset(900)">15 دقيقة</button>
+          <button class="preset-btn" style="padding:14px; font-size:1.05rem;" onclick="startPreset(1800)">30 دقيقة</button>
+          <button class="preset-btn" style="padding:14px; font-size:1.05rem;" onclick="startPreset(3600)">ساعة واحدة</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: QUICK ACTIONS -->
+    <div class="tab-pane desktop-grid-3" id="pane-quick">
+      <div class="box-card">
+        <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> <span data-i18n="instantActions">إجراءات سريعة وفورية</span></div>
+        <div class="tiles-grid">
+          <div class="action-tile danger" onclick="sendPowerCmd('shutdown', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg></span>
+            <span class="tile-label" data-i18n="shutdown">إيقاف التشغيل</span>
+          </div>
+          <div class="action-tile" onclick="sendPowerCmd('restart', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg></span>
+            <span class="tile-label" data-i18n="restart">إعادة التشغيل</span>
+          </div>
+          <div class="action-tile" onclick="sendPowerCmd('sleep', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+            <span class="tile-label" data-i18n="sleep">وضع النوم</span>
+          </div>
+          <div class="action-tile" onclick="sendPowerCmd('display_off', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg></span>
+            <span class="tile-label" data-i18n="display_off">إطفاء الشاشة</span>
+          </div>
+          <div class="action-tile" onclick="sendPowerCmd('lock', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+            <span class="tile-label" data-i18n="lock">قفل الشاشة</span>
+          </div>
+          <div class="action-tile" onclick="sendPowerCmd('signout', 0)">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" class="ui-icon" style="width:28px;height:28px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></span>
+            <span class="tile-label" data-i18n="logout">تسجيل الخروج</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Remote Lock Card (ARN Lock) -->
+      <div class="box-card" id="cardRemoteLock">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span data-i18n="lockTitle">شاشة القفل المخصصة (ARN Lock)</span>
+          </div>
+          <span class="status-badge" id="badgeLockStatus" style="background:rgba(148,163,184,0.15); color:var(--muted);">مفتوح</span>
+        </div>
+
+        <!-- Unlocked View -->
+        <div id="lockViewInactive">
+          <p style="font-size:12px; color:var(--muted); margin-bottom:10px;" data-i18n="lockDesc">
+            تجميد شاشة الكمبيوتر بنافذة كاملة مخصصة وعرض رسالة للمتطفلين ومنع استخدام الجهاز.
+          </p>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <input 
+              type="text" 
+              id="inputCustomLockMsg" 
+              class="large-select-box" 
+              style="text-align:start; font-size:13px;" 
+              placeholder="رسالة القفل (مثال: الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب)" 
+              value="الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب"
+            />
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="ghost-btn" style="padding:4px 10px; font-size:11px;" onclick="setPresetLockMsg('الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب')">تحت الصيانة 🔧</button>
+              <button class="ghost-btn" style="padding:4px 10px; font-size:11px;" onclick="setPresetLockMsg('سأعود قريباً - ممنوع الاستخدام ⏳')">سأعود قريباً ⏳</button>
+              <button class="ghost-btn" style="padding:4px 10px; font-size:11px;" onclick="setPresetLockMsg('⚠️ تحذير: هذا الحاسوب مراقب عن بعد!')">مراقب عن بعد 🛡️</button>
+            </div>
+            <button class="action-btn btn-lock" id="btnActivateLock" onclick="activateRemoteLock()">
+              <span data-i18n="lockBtn">🔒 تفعيل قفل الشاشة الآن</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Locked View (Shown when locked) -->
+        <div id="lockViewActive" style="display:none; text-align:center; padding:10px 0;">
+          <div style="font-size:13.5px; font-weight:700; color:var(--danger); margin-bottom:8px; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span class="pulse-dot"></span>
+            <span data-i18n="lockedAlert">شاشة الكمبيوتر مقفلة حالياً عن بعد!</span>
+          </div>
+          <div id="activeLockMsgDisplay" style="font-size:13px; color:var(--text); background:rgba(15,23,42,0.8); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:10px 14px; margin-bottom:12px; word-break:break-word;">
+            الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب
+          </div>
+          <button class="action-btn btn-unlock" id="btnDeactivateLock" onclick="deactivateRemoteLock()">
+            <span data-i18n="unlockBtn">🔓 فك القفل عن بعد (Remote Unlock)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="box-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg> إضاءة الشاشة</div>
+          <span class="status-badge" id="brightnessPercentBadge">50%</span>
+        </div>
+        <div class="slider-row" style="margin: 4px 0 8px;">
+          <input type="range" id="brightnessSlider" min="0" max="100" value="50" oninput="document.getElementById('brightnessPercentBadge').textContent = this.value + '%'" onchange="sendBrightness(this.value)">
+        </div>
+      </div>
+
+      <div class="box-card">
+        <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> فتح رابط في الكمبيوتر</div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="urlInput" class="large-select-box" style="flex:1; text-align:start;" placeholder="https://youtube.com/...">
+          <button class="ghost-btn" onclick="sendOpenUrl()" style="padding:0 16px;">فتح</button>
+        </div>
+      </div>
+
+      <div class="box-card">
+        <button class="btn-big-start" style="border-color:var(--danger); color:var(--danger);" onclick="sendAbortCmd()">
+          <span><svg viewBox="0 0 24 24" class="ui-icon" style="stroke:var(--danger)"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg> <span data-i18n="abortPending">إلغاء أي أمر مجدول أو معلّق (Abort)</span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 3: CONTROL (Trackpad & Keyboard) -->
+    <div class="tab-pane desktop-grid-2" id="pane-control">
+      <div class="box-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="5" y="2" width="14" height="20" rx="7"></rect><line x1="12" y1="6" x2="12" y2="10"></line></svg> <span data-i18n="trackpad">تراك باد الفأرة</span></div>
+          <span style="font-size:0.72rem;color:var(--cyan)" id="dragStatus"></span>
+        </div>
+        <div class="trackpad-box" id="trackpadArea" style="min-height:450px;">
+          <div class="trackpad-hint" data-i18n="trackpadHint">المس وحرّك للتحكم بالماوس<br>نقرة = يسار · إصبعان = يمين · الشريط الجانبي للتمرير</div>
+          <div class="scroll-strip" id="scrollStrip">↕</div>
+        </div>
+        <div class="grid-2">
+          <button class="ghost-btn" onclick="sendMouseClick('right')"><svg viewBox="0 0 24 24" class="ui-icon"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg> <span data-i18n="rightClick">نقر أيمن</span></button>
+          <button class="ghost-btn" onclick="sendMouseClick('left')"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M12 2v20"></path><path d="M2 12h20"></path></svg> <span data-i18n="leftClick">نقر أيسر</span></button>
+        </div>
+      </div>
+
+      <!-- Real-time Direct Typing -->
+      <div class="box-card">
+        <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.01"></path><path d="M10 8h.01"></path><path d="M14 8h.01"></path><path d="M18 8h.01"></path><path d="M8 12h.01"></path><path d="M12 12h.01"></path><path d="M16 12h.01"></path><path d="M7 16h10"></path></svg> <span data-i18n="keyboard">لوحة المفاتيح والكتابة المباشرة</span></div>
+        <input type="text" id="typeTextInput" class="large-select-box" style="text-align:start;" placeholder="اكتب هنا للإرسال الفوري للكمبيوتر…" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- TAB 4: SCREEN -->
+    <div class="tab-pane" id="pane-screen">
+      <div class="box-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> <span data-i18n="liveScreen">بث الشاشة المباشر</span></div>
+          <button class="ghost-btn" id="btnToggleStream" onclick="toggleScreenStream()"><span data-i18n="startStream">بدء البث</span></button>
+        </div>
+        <div class="screen-wrapper" id="screenContainer">
+          <img id="screenStreamImg" class="screen-img" alt="Screen" src="" style="display:none" onclick="onScreenTouchClick(event)">
+          <div class="empty-hint" id="screenPlaceholder" data-i18n="streamHint">اضغط «بدء البث» لمشاهدة شاشة الكمبيوتر مباشرة</div>
+        </div>
+        <div class="grid-2">
+          <button class="ghost-btn" onclick="captureSnapshot()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> <span data-i18n="snapshot">لقطة سريعة</span></button>
+          <button class="ghost-btn" id="btnTouchMode" onclick="toggleTouchMode()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M12 21A9 9 0 0 1 3 12c0-5 3.8-9 8.5-9"></path><path d="M12 2v9l3-3"></path><path d="M12 11l-3-3"></path><path d="M21 12A9 9 0 0 1 12 21"></path></svg> <span id="touchModeLabel">اللمس: معطل</span></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: FILES -->
+    <div class="tab-pane" id="pane-files">
+      <div class="box-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> <span data-i18n="fileExplorer">مستكشف الملفات</span></div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="ghost-btn" onclick="triggerFileUpload()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> <span data-i18n="upload">رفع ملفات</span></button>
+            <button class="ghost-btn" onclick="triggerFolderUpload()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg> <span data-i18n="uploadFolder">رفع مجلد</span></button>
+            <input type="file" id="fileUploadInput" style="display:none" onchange="handleFileUpload(event)" multiple>
+            <input type="file" id="folderUploadInput" style="display:none" webkitdirectory directory multiple onchange="handleFolderUpload(event)">
+          </div>
+        </div>
+
+        <!-- Linear Upload Progress Card -->
+        <div class="box-card" id="uploadProgressCard" style="display:none; background:linear-gradient(180deg, rgba(6,182,212,0.12) 0%, rgba(12,20,36,0.98) 100%); border-color:var(--cyan); padding:12px; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12.5px; font-weight:800; color:var(--cyan);"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> جاري الرفع…</span>
+            <span class="status-badge" id="uploadPercentBadge" style="font-size:11px;">0%</span>
+          </div>
+          <div style="font-size:11.5px; color:var(--text); direction:ltr; text-align:start; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="uploadFileName">...</div>
+          <div style="width:100%; height:8px; background:rgba(255,255,255,0.06); border-radius:99px; overflow:hidden; margin:3px 0;">
+            <div class="countdown-bar" id="uploadProgressBar" style="width:0%; height:100%; border-radius:99px; transition:width 0.2s ease;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:var(--muted); font-weight:700;">
+            <span id="uploadStats">0 MB / 0 MB</span>
+            <span id="uploadSpeed">0 MB/s</span>
+          </div>
+          <button class="ghost-btn danger" onclick="cancelActiveUpload()" style="width:100%; justify-content:center; padding:6px; margin-top:2px;">
+            <svg viewBox="0 0 24 24" class="ui-icon" style="stroke:var(--danger)"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg> <span>إلغاء الرفع</span>
+          </button>
+        </div>
+
+        <div class="drives-bar" id="drivesBar"></div>
+        <div class="breadcrumbs" id="breadcrumbsBar"></div>
+        <div class="files-list" id="filesListContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 6: MEDIA & TOOLS -->
+    <div class="tab-pane" id="pane-media">
+      <div class="box-card">
+        <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg> <span data-i18n="mediaControl">التحكم بالوسائط</span></div>
+        <div class="grid-4">
+          <button class="ghost-btn" onclick="sendMediaAction('prev')"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg></button>
+          <button class="ghost-btn" onclick="sendMediaAction('play_pause')" style="color:var(--cyan);"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></button>
+          <button class="ghost-btn" onclick="sendMediaAction('next')"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg></button>
+          <button class="ghost-btn danger" onclick="sendMediaAction('stop')"><svg viewBox="0 0 24 24" class="ui-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></button>
+        </div>
+      </div>
+
+      <div class="box-card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg> <span data-i18n="volume">مستوى الصوت</span></div>
+          <span class="status-badge" id="volumePercentBadge">50%</span>
+        </div>
+        <div class="slider-row" style="margin: 4px 0 8px;">
+          <svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--muted)"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon></svg>
+          <input type="range" id="volumeSlider" min="0" max="100" value="50" oninput="onVolumeSliderChange(this.value)" onchange="sendVolumePercent(this.value)">
+          <svg viewBox="0 0 24 24" class="ui-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+        </div>
+        <div class="grid-3">
+          <button class="ghost-btn" onclick="sendMediaAction('volume_down')"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="15" y1="12" x2="21" y2="12"></line></svg> خفض</button>
+          <button class="ghost-btn" onclick="sendMediaAction('volume_mute')"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg> كتم</button>
+          <button class="ghost-btn" onclick="sendMediaAction('volume_up')"><svg viewBox="0 0 24 24" class="ui-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="15" y1="9" x2="21" y2="9"></line><line x1="18" y1="6" x2="18" y2="12"></line></svg> رفع</button>
+        </div>
+      </div>
+
+      <div class="box-card">
+        <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg> <span data-i18n="clipboardSync">مزامنة الحافظة</span></div>
+        <textarea id="clipboardText" rows="2" class="large-select-box" style="text-align:start; resize:none;" placeholder="نص الحافظة…"></textarea>
+        <div class="grid-2">
+          <button class="ghost-btn" onclick="getClipboard()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> سحب من الكمبيوتر</button>
+          <button class="ghost-btn" onclick="setClipboard()"><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> إرسال للكمبيوتر</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> <!-- end main-content -->
+
+
+<script>
+"use strict";
+
+let currentLang = "ar";
+let activeCountdown = null;
+let currentPath = "";
+let streamActive = false;
+let touchMode = false;
+let dragLock = false;
+let selectedTimerAction = "shutdown";
+
+const I18N = {
+  ar: {
+    connected: "متصل", disconnected: "غير متصل",
+    loginTitle: "تسجيل الدخول للتحكم", loginBtn: "تسجيل الدخول والاتصال",
+    startTimer: "بدء العداد", cancelCountdown: "إلغاء العداد",
+    idle: "جاهز", remaining: "الوقت المتبقي",
+    shutdown: "إيقاف التشغيل", restart: "إعادة التشغيل", sleep: "وضع النوم", display_off: "إطفاء الشاشة", lock: "قفل الشاشة", logout: "تسجيل الخروج",
+    openOnPc: "تشغيل على الكمبيوتر", downloadToPhone: "تنزيل إلى الهاتف",
+    rename: "إعادة تسمية", delete: "حذف", cancel: "إلغاء", confirm: "تأكيد",
+    upload: "رفع ملف", startStream: "بدء البث", stopStream: "إيقاف البث",
+    snapshot: "لقطة سريعة", streamHint: "اضغط «بدء البث» لمشاهدة شاشة الكمبيوتر مباشرة",
+    hourUnit: "ساعة", minuteUnit: "دقيقة",
+    timer: "المؤقت", quick: "سريعة", control: "التحكم", screen: "الشاشة", files: "الملفات", media: "الوسائط",
+    lockTitle: "شاشة القفل المخصصة (ARN Lock)",
+    lockDesc: "تجميد شاشة الكمبيوتر بنافذة كاملة مخصصة وعرض رسالة للمتطفلين ومنع استخدام الجهاز.",
+    lockBtn: "🔒 تفعيل قفل الشاشة الآن",
+    unlockBtn: "🔓 فك القفل عن بعد (Remote Unlock)",
+    lockedStatus: "مقفل 🔒",
+    unlockedStatus: "مفتوح",
+    lockedAlert: "شاشة الكمبيوتر مقفلة حالياً عن بعد!",
+    presetMaint: "تحت الصيانة 🔧",
+    presetSoon: "سأعود قريباً ⏳",
+    presetMonitored: "مراقب عن بعد 🛡️"
+  },
+  en: {
+    connected: "Connected", disconnected: "Disconnected",
+    loginTitle: "Remote Login", loginBtn: "Login & Connect",
+    startTimer: "Start Countdown", cancelCountdown: "Cancel Countdown",
+    idle: "Ready", remaining: "Remaining",
+    shutdown: "Shutdown", restart: "Restart", sleep: "Sleep", display_off: "Turn off display", lock: "Lock Screen", logout: "Logout",
+    openOnPc: "Open on PC", downloadToPhone: "Download to Phone",
+    rename: "Rename", delete: "Delete", cancel: "Cancel", confirm: "Confirm",
+    upload: "Upload File", startStream: "Start Stream", stopStream: "Stop Stream",
+    snapshot: "Snapshot", streamHint: "Press “Start Stream” to watch computer screen live",
+    hourUnit: "Hours", minuteUnit: "Minutes",
+    timer: "Timer", quick: "Quick", control: "Control", screen: "Screen", files: "Files", media: "Media",
+    lockTitle: "Custom Screen Lock (ARN Lock)",
+    lockDesc: "Freeze PC screen with a custom fullscreen window, show a message, and prevent unauthorized usage.",
+    lockBtn: "🔒 Activate Screen Lock Now",
+    unlockBtn: "🔓 Remote Unlock PC",
+    lockedStatus: "Locked 🔒",
+    unlockedStatus: "Unlocked",
+    lockedAlert: "Host PC screen is currently locked remotely!",
+    presetMaint: "Maintenance 🔧",
+    presetSoon: "Back Soon ⏳",
+    presetMonitored: "Monitored 🛡️"
+  }
+};
+
+function t(k) { return (I18N[currentLang] && I18N[currentLang][k]) || k; }
+
+function pad(n) { return String(n).padStart(2, "0"); }
+function formatHMS(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sc = s % 60;
+  return `${pad(h)}:${pad(m)}:${pad(sc)}`;
+}
+
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+function populateTimeOptions() {
+  const selH = document.getElementById("selectHours");
+  const selM = document.getElementById("selectMinutes");
+  if (!selH || !selM) return;
+  selH.innerHTML = "";
+  selM.innerHTML = "";
+  for (let i = 0; i <= 3; i++) {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${pad(i)} ${t("hourUnit")}`;
+    selH.appendChild(opt);
+  }
+  for (let i = 0; i <= 59; i++) {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${pad(i)} ${t("minuteUnit")}`;
+    if (i === 5) opt.selected = true;
+    selM.appendChild(opt);
+  }
+}
+
+function switchTab(name, navEl) {
+  document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+  const pane = document.getElementById(`pane-${name}`);
+  if (pane) pane.classList.add("active");
+  if (navEl) navEl.classList.add("active");
+  if (name === "files" && !currentPath) loadDrives();
+}
+
+function selectAction(act, btn) {
+  selectedTimerAction = act;
+  document.querySelectorAll(".action-pill-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+}
+
+function startPreset(secs) {
+  document.getElementById("selectHours").value = Math.floor(secs / 3600);
+  document.getElementById("selectMinutes").value = Math.floor((secs % 3600) / 60);
+  startCountdown(secs);
+}
+
+async function handleDynamicTimerClick() {
+  if (activeCountdown) {
+    await cancelCountdown();
+  } else {
+    const h = parseInt(document.getElementById("selectHours").value, 10) || 0;
+    const m = parseInt(document.getElementById("selectMinutes").value, 10) || 0;
+    const total = h * 3600 + m * 60;
+    if (total <= 0) {
+      showToast("يرجى تحديد وقت صالح");
+      return;
+    }
+    startCountdown(total);
+  }
+}
+
+async function startCountdown(secs) {
+  try {
+    const res = await apiFetch("/api/command", {
+      method: "POST",
+      body: JSON.stringify({ action: selectedTimerAction, delaySecs: secs, force: false })
+    });
+    if (res.ok) {
+      showToast("تم بدء العداد بنجاح");
+      pollStats();
+    } else {
+      showToast(res.error || "فشل بدء العداد");
+    }
+  } catch (e) {
+    showToast("خطأ في الاتصال");
+  }
+}
+
+async function cancelCountdown() {
+  try {
+    const res = await apiFetch("/api/abort", { method: "POST" });
+    if (res.ok) {
+      showToast("تم إلغاء العداد");
+      updateCountdownUI(null);
+    }
+  } catch (e) {
+    showToast("خطأ في الاتصال");
+  }
+}
+
+async function togglePauseResume() {
+  if (!activeCountdown) return;
+  const act = activeCountdown.paused ? "resume" : "pause";
+  try {
+    await apiFetch("/api/command", { method: "POST", body: JSON.stringify({ action: act }) });
+    pollStats();
+  } catch (e) {}
+}
+
+async function sendPowerCmd(act, delay = 0) {
+  try {
+    const res = await apiFetch("/api/command", {
+      method: "POST",
+      body: JSON.stringify({ action: act, delaySecs: delay, force: false })
+    });
+    if (res.ok) showToast(`تم تنفيذ: ${t(act)}`);
+    else showToast(res.error || "فشل التنفيذ");
+  } catch (e) {
+    showToast("خطأ في الاتصال");
+  }
+}
+
+async function sendAbortCmd() {
+  try {
+    const res = await apiFetch("/api/abort", { method: "POST" });
+    if (res.ok) {
+      showToast("تم إلغاء الأمر بنجاح");
+      updateCountdownUI(null);
+    }
+  } catch (e) {
+    showToast("خطأ في الاتصال");
+  }
+}
+
+async function sendBrightness(val) {
+  try { await apiFetch("/api/system/brightness", { method: "POST", body: JSON.stringify({ brightness: parseInt(val, 10) }) }); } catch (e) {}
+}
+
+async function sendOpenUrl() {
+  const url = document.getElementById("urlInput").value.trim();
+  if(!url) return;
+  try {
+    await apiFetch("/api/system/open_url", { method: "POST", body: JSON.stringify({ url }) });
+    showToast("تم فتح الرابط");
+    document.getElementById("urlInput").value = "";
+  } catch(e) {}
+}
+
+function updateCountdownUI(state) {
+  const runBox = document.getElementById("runningCountdownBox");
+  const dynBtn = document.getElementById("btnDynamicTimer");
+  const lblStart = document.getElementById("lblStartBtn");
+  const bolt = document.getElementById("boltIcon");
+
+  if (!state || !state.action || state.remainingSecs <= 0) {
+    activeCountdown = null;
+    if (runBox) runBox.style.display = "none";
+    if (dynBtn) {
+      dynBtn.classList.remove("danger-glow", "btn-running");
+      dynBtn.classList.add("cyan-glow");
+      if (lblStart) lblStart.textContent = t("startTimer");
+      if (bolt) bolt.innerHTML = '<svg viewBox="0 0 24 24" class="ui-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>';
+    }
+    return;
+  }
+
+  activeCountdown = state;
+  if (runBox) runBox.style.display = "block";
+
+  const dTime = document.getElementById("cdDigitalTime");
+  if (dTime) dTime.textContent = formatHMS(state.remainingSecs);
+
+  const bar = document.getElementById("cdProgressBar");
+  if (bar && state.totalSecs > 0) {
+    const pct = Math.max(0, Math.min(100, ((state.totalSecs - state.remainingSecs) / state.totalSecs) * 100));
+    bar.style.width = pct + "%";
+  }
+
+  const pBtn = document.getElementById("lblBtnPause");
+  const pIco = document.getElementById("cdPauseIcon");
+  if (pBtn) pBtn.textContent = state.paused ? "استئناف" : "إيقاف مؤقت";
+  if (pIco) pIco.innerHTML = state.paused ? '<svg viewBox="0 0 24 24" class="ui-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' : '<svg viewBox="0 0 24 24" class="ui-icon"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+
+  if (dynBtn) {
+    dynBtn.classList.remove("cyan-glow");
+    dynBtn.classList.add("danger-glow", "btn-running");
+    if (lblStart) lblStart.textContent = t("cancelCountdown");
+    if (bolt) bolt.innerHTML = '<svg viewBox="0 0 24 24" class="ui-icon" style="stroke:var(--danger)"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+  }
+}
+
+// ------------------------------------------------------------ API & Polling
+// All API calls go through Python's pywebview bridge (bypasses CORS)
+async function apiFetch(url, options = {}) {
+  if (!window.pywebview || !window.pywebview.api) throw new Error("Bridge not ready");
+  if (options.method === "POST") {
+    return await pywebview.api.api_post(url, options.body || "{}");
+  } else {
+    return await pywebview.api.api_get(url);
+  }
+}
+
+let lastLockState = { locked: false, message: "" };
+
+function updateLockUI(lockData) {
+  if (lockData && typeof lockData === "object" && ("locked" in lockData)) {
+    lastLockState = lockData;
+  }
+  const isLocked = !!(lastLockState && lastLockState.locked);
+  const inactiveEl = document.getElementById("lockViewInactive");
+  const activeEl = document.getElementById("lockViewActive");
+  const badgeEl = document.getElementById("badgeLockStatus");
+  const msgEl = document.getElementById("activeLockMsgDisplay");
+  const topBadge = document.getElementById("topLockBadge");
+
+  if (topBadge) {
+    topBadge.style.display = isLocked ? "inline-flex" : "none";
+    topBadge.textContent = isLocked ? (currentLang === "ar" ? "🔒 مقفل" : "🔒 Locked") : "";
+  }
+
+  if (!inactiveEl || !activeEl) return;
+
+  if (isLocked) {
+    inactiveEl.style.display = "none";
+    activeEl.style.display = "block";
+    if (badgeEl) {
+      badgeEl.textContent = currentLang === "ar" ? "مقفل 🔒" : "Locked 🔒";
+      badgeEl.style.background = "rgba(239, 68, 68, 0.2)";
+      badgeEl.style.color = "#f87171";
+      badgeEl.style.borderColor = "rgba(239, 68, 68, 0.4)";
+    }
+    if (msgEl) {
+      msgEl.textContent = lastLockState.message || (currentLang === "ar" ? "الجهاز تحت الصيانة - يرجى عدم لمس الحاسوب" : "System under maintenance - Please do not touch");
+    }
+  } else {
+    inactiveEl.style.display = "block";
+    activeEl.style.display = "none";
+    if (badgeEl) {
+      badgeEl.textContent = currentLang === "ar" ? "مفتوح" : "Unlocked";
+      badgeEl.style.background = "rgba(148, 163, 184, 0.15)";
+      badgeEl.style.color = "var(--muted)";
+      badgeEl.style.borderColor = "rgba(148, 163, 184, 0.3)";
+    }
+  }
+}
+
+function setPresetLockMsg(txt) {
+  const input = document.getElementById("inputCustomLockMsg");
+  if (input) input.value = txt;
+}
+
+async function activateRemoteLock() {
+  const input = document.getElementById("inputCustomLockMsg");
+  const msg = input ? input.value.trim() : "";
+  const btn = document.getElementById("btnActivateLock");
+  if (btn) btn.disabled = true;
+  try {
+    let res;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_lock) {
+      res = await pywebview.api.activate_lock(msg);
+    } else {
+      res = await apiFetch("/api/lock/activate", {
+        method: "POST",
+        body: JSON.stringify({ message: msg })
+      });
+    }
+    if (res && res.ok) {
+      showToast(currentLang === "ar" ? "تم تفعيل قفل الشاشة بنجاح 🔒" : "Screen lock activated successfully 🔒");
+      updateLockUI({ locked: true, message: msg });
+    } else {
+      showToast((res && res.error) ? res.error : (currentLang === "ar" ? "فشل قفل الشاشة" : "Failed to lock screen"));
+    }
+  } catch (err) {
+    showToast(currentLang === "ar" ? "تعذر الاتصال بالخادم" : "Connection error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function deactivateRemoteLock() {
+  const btn = document.getElementById("btnDeactivateLock");
+  if (btn) btn.disabled = true;
+  try {
+    let res;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.unlock_lock) {
+      res = await pywebview.api.unlock_lock();
+    } else {
+      res = await apiFetch("/api/lock/unlock", {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+    }
+    if (res && res.ok) {
+      showToast(currentLang === "ar" ? "تم فك قفل الشاشة بنجاح 🔓" : "Screen unlocked successfully 🔓");
+      updateLockUI({ locked: false });
+    } else {
+      showToast((res && res.error) ? res.error : (currentLang === "ar" ? "فشل فك القفل" : "Failed to unlock"));
+    }
+  } catch (err) {
+    showToast(currentLang === "ar" ? "تعذر الاتصال بالخادم" : "Connection error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function pollStats() {
+  try {
+    const data = await apiFetch("/api/system/summary");
+    const conn = document.getElementById("connStatus");
+    if (conn) {
+      conn.textContent = t("connected");
+      conn.classList.remove("bad");
+    }
+
+    if (data.hostname) document.getElementById("hostName").textContent = data.hostname;
+    if (data.cpuPercent !== undefined) document.getElementById("cpuVal").textContent = data.cpuPercent.toFixed(0) + "%";
+    if (data.ramPercent !== undefined) document.getElementById("ramVal").textContent = data.ramPercent.toFixed(0) + "%";
+    if (data.batteryPercent !== null && data.batteryPercent !== undefined) {
+      const bStat = document.getElementById("battStat");
+      const bVal = document.getElementById("battVal");
+      if (bStat && bVal) {
+        bStat.style.display = "inline";
+        bVal.textContent = data.batteryPercent + "%";
+      }
+    }
+
+    if (data.countdown && data.countdown.action) updateCountdownUI(data.countdown);
+    else updateCountdownUI(null);
+
+    // Poll lock status
+    try {
+      let lockRes;
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.get_lock_status) {
+        lockRes = await pywebview.api.get_lock_status();
+      } else {
+        lockRes = await apiFetch("/api/lock/status");
+      }
+      updateLockUI(lockRes);
+    } catch (_) {}
+  } catch (e) {
+    const conn = document.getElementById("connStatus");
+    if (conn) {
+      conn.textContent = t("disconnected");
+      conn.classList.add("bad");
+    }
+  }
+}
+
+async function loginWithCredentials() {
+  const u = document.getElementById("authUsername").value.trim();
+  const p = document.getElementById("authPassword").value.trim();
+  try {
+    const data = await pywebview.api.login(u, p);
+    if (data.ok) {
+      document.getElementById("authCard").style.display = "none";
+      showToast("تم تسجيل الدخول بنجاح");
+      pollStats();
+    } else {
+      showToast(data.error || "خطأ في تسجيل الدخول");
+    }
+  } catch (e) {
+    showToast("خطأ في الاتصال");
+  }
+}
+
+function logoutRemote() {
+  pywebview.api.disconnect();
+  document.getElementById("connectionScreen").classList.remove("hidden");
+  showToast("تم قطع الاتصال");
+}
+
+function toggleLang() {
+  currentLang = currentLang === "ar" ? "en" : "ar";
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+  document.getElementById("btnLangToggle").textContent = currentLang === "ar" ? "EN" : "AR";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const k = el.getAttribute("data-i18n");
+    if (I18N[currentLang] && I18N[currentLang][k]) {
+      el.textContent = I18N[currentLang][k];
+    }
+  });
+  const lockMsgInput = document.getElementById("inputCustomLockMsg");
+  if (lockMsgInput) {
+    lockMsgInput.placeholder = t("lockPlaceholder");
+  }
+  updateLockUI(lastLockState);
+  populateTimeOptions();
+  pollStats();
+}
+
+// ------------------------------------------------------------ Trackpad & Input
+const tp = document.getElementById("trackpadArea");
+let lastTouchX = 0, lastTouchY = 0;
+if (tp) {
+  tp.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 1) {
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  tp.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 1) {
+      const dx = (e.touches[0].clientX - lastTouchX) * 1.8;
+      const dy = (e.touches[0].clientY - lastTouchY) * 1.8;
+      lastTouchX = e.touches[0].clientX;
+      lastTouchY = e.touches[0].clientY;
+      apiFetch("/api/input/mouse", { method: "POST", body: JSON.stringify({ action: "move", dx, dy }) }).catch(() => {});
+    }
+  }, { passive: true });
+}
+
+async function sendMouseClick(btn) {
+  try { await apiFetch("/api/input/mouse", { method: "POST", body: JSON.stringify({ action: "click", button: btn }) }); } catch (e) {}
+}
+
+function toggleDrag() {
+  dragLock = !dragLock;
+  document.getElementById("dragStatus").textContent = dragLock ? "السحب مفعّل 🔒" : "";
+  apiFetch("/api/input/mouse", { method: "POST", body: JSON.stringify({ action: dragLock ? "down" : "up", button: "left" }) }).catch(() => {});
+}
+
+// ------------------------------------------------------------ Keyboard
+const typeInput = document.getElementById("typeTextInput");
+if (typeInput) {
+  typeInput.addEventListener("input", (e) => {
+    if (e.data) {
+      apiFetch("/api/input/keyboard", { method: "POST", body: JSON.stringify({ action: "type_text", text: e.data }) }).catch(() => {});
+    }
+  });
+  typeInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      apiFetch("/api/input/keyboard", { method: "POST", body: JSON.stringify({ action: "key_press", key: "enter" }) }).catch(() => {});
+      typeInput.value = "";
+    } else if (e.key === "Backspace") {
+      apiFetch("/api/input/keyboard", { method: "POST", body: JSON.stringify({ action: "key_press", key: "backspace" }) }).catch(() => {});
+    }
+  });
+}
+async function sendKey(k) {
+  try { await apiFetch("/api/input/keyboard", { method: "POST", body: JSON.stringify({ action: "key_press", key: k }) }); } catch (e) {}
+}
+async function sendHotkey(keys) {
+  try { await apiFetch("/api/input/keyboard", { method: "POST", body: JSON.stringify({ action: "hotkey", keys }) }); } catch (e) {}
+}
+
+// ------------------------------------------------------------ Screen Stream
+async function toggleScreenStream() {
+  streamActive = !streamActive;
+  const btn = document.getElementById("btnToggleStream");
+  const img = document.getElementById("screenStreamImg");
+  const ph = document.getElementById("screenPlaceholder");
+
+  if (streamActive) {
+    btn.textContent = t("stopStream");
+    btn.style.color = "var(--danger)";
+    if (img) img.style.display = "block";
+    if (ph) ph.style.display = "none";
+    
+    // Get the full server URL for the MJPEG stream from the Python bridge
+    const streamUrl = await pywebview.api.get_stream_url("/api/screen/stream");
+    if (img && streamUrl) img.src = streamUrl;
+  } else {
+    btn.textContent = t("startStream");
+    btn.style.color = "";
+    if (img) {
+      img.src = "";
+      img.style.display = "none";
+    }
+    if (ph) ph.style.display = "block";
+  }
+}
+
+async function captureSnapshot() {
+  const url = await pywebview.api.get_frame_url(95);
+  if (url) window.open(url, "_blank");
+}
+
+function toggleTouchMode() {
+  touchMode = !touchMode;
+  document.getElementById("touchModeLabel").textContent = touchMode ? "اللمس: مفعّل" : "اللمس: معطل";
+}
+
+function onScreenTouchClick(e) {
+  if (!touchMode) return;
+  const rect = e.target.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  apiFetch("/api/input/mouse", { method: "POST", body: JSON.stringify({ action: "click", button: "left" }) }).catch(() => {});
+}
+
+// ------------------------------------------------------------ Files Explorer
+async function loadDrives() {
+  try {
+    const data = await apiFetch("/api/fs/list");
+    const bar = document.getElementById("drivesBar");
+    if (bar && data.drives) {
+      bar.innerHTML = data.drives.map(d => {
+        const letter = d.replace(":\\\\", "").replace(":\\", "").replace(":", "");
+        return `<div class="drive-card" onclick="openFolder('${d.replace(/\\/g, '\\\\')}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="drive-icon"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>
+          <span>${letter}</span>
+        </div>`;
+      }).join("");
+      if (data.drives.length > 0) openFolder(data.drives[0]);
+    }
+  } catch (e) {}
+}
+
+function getParentPath(path) {
+  if (!path) return "";
+  let p = path.replace(/[\\/]+$/, ""); // remove trailing slashes
+  let lastSlash = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
+  if (lastSlash === -1) return "";
+  let parent = p.substring(0, lastSlash);
+  if (parent.endsWith(":")) parent += "\\";
+  return parent;
+}
+
+function goBack() {
+  const parent = getParentPath(currentPath);
+  if (parent) {
+    openFolder(parent);
+  } else {
+    loadDrives();
+  }
+}
+
+async function openFolder(path) {
+  currentPath = path;
+  try {
+    const data = await apiFetch(`/api/fs/list?path=${encodeURIComponent(path)}`);
+    const bc = document.getElementById("breadcrumbsBar");
+    if (bc) bc.innerHTML = `<span class="breadcrumb-item" onclick="loadDrives()">الأقراص</span> / <span>${path}</span>`;
+
+    const container = document.getElementById("filesListContainer");
+    if (container && data.items) {
+      let html = "";
+      const parent = getParentPath(path);
+      if (parent) {
+        html += `
+          <div class="file-card" onclick="goBack()">
+            <div class="file-card-icon">↩️</div>
+            <div class="file-card-name">رجوع للخلف</div>
+          </div>
+        `;
+      }
+      
+      html += data.items.map(item => `
+        <div class="file-card">
+          <div class="file-card-opts" onclick="promptFileAction('${item.name.replace(/'/g, "\\'")}', '${item.path.replace(/\\/g, '\\\\')}', '${item.size || ''}', ${item.isDir}); event.stopPropagation();">⋮</div>
+          <div style="display:flex; flex-direction:column; align-items:center; width:100%;" onclick="${item.isDir ? `openFolder('${item.path.replace(/\\/g, '\\\\')}')` : `promptFileAction('${item.name.replace(/'/g, "\\'")}', '${item.path.replace(/\\/g, '\\\\')}', '${item.size || ''}', false)`}">
+            <div class="file-card-icon">${item.isDir ? '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--cyan);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>' : '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'}</div>
+            <div class="file-card-name">${item.name}</div>
+            ${item.size ? `<div class="file-card-size">${Math.round(item.size/1024)} KB</div>` : (item.isDir ? '<div class="file-card-size">مجلد</div>' : '')}
+          </div>
+        </div>
+      `).join("");
+      container.innerHTML = html;
+    }
+  } catch (e) {}
+}
+
+let selectedFilePath = "";
+let selectedFileIsDir = false;
+
+function promptFileAction(name, path, size, isDir = false) {
+  selectedFilePath = path;
+  selectedFileIsDir = isDir;
+  document.getElementById("fileModalName").textContent = name;
+  document.getElementById("fileModalSize").textContent = isDir ? "مجلد" : size;
+  
+  const btnOpenPc = document.getElementById("btnFileOpenPc");
+  const btnDownload = document.getElementById("btnFileDownload");
+  
+  if (isDir) {
+    if (btnOpenPc) btnOpenPc.style.display = "none";
+    if (btnDownload) btnDownload.innerHTML = '<span><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></span> <span>تنزيل المجلد كـ ZIP</span>';
+  } else {
+    if (btnOpenPc) btnOpenPc.style.display = "flex";
+    if (btnDownload) btnDownload.innerHTML = '<span><svg viewBox="0 0 24 24" class="ui-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></span> <span>تنزيل إلى الهاتف</span>';
+  }
+  
+  document.getElementById("fileActionModal").classList.add("open");
+}
+function closeFileActionModal() {
+  document.getElementById("fileActionModal").classList.remove("open");
+}
+async function openFileOnPcSelected() {
+  closeFileActionModal();
+  try {
+    await apiFetch("/api/fs/open", { method: "POST", body: JSON.stringify({ path: selectedFilePath }) });
+    showToast("تم الفتح على الكمبيوتر");
+  } catch (e) {}
+}
+async function downloadFileSelected() {
+  closeFileActionModal();
+  const url = await pywebview.api.get_download_url(selectedFilePath);
+  if (url) window.open(url, "_blank");
+}
+async function deleteFileSelected() {
+  closeFileActionModal();
+  if (!confirm("هل أنت متأكد من نقل الملف لسلة المحذوفات؟")) return;
+  try {
+    await apiFetch("/api/fs/delete", { method: "POST", body: JSON.stringify({ path: selectedFilePath }) });
+    showToast("تم الحذف");
+    openFolder(currentPath);
+  } catch (e) {}
+}
+async function renameFileSelected() {
+  closeFileActionModal();
+  const newName = prompt("الاسم الجديد:");
+  if (!newName) return;
+  try {
+    await apiFetch("/api/fs/rename", { method: "POST", body: JSON.stringify({ path: selectedFilePath, newName: newName }) });
+    showToast("تمت إعادة التسمية");
+    openFolder(currentPath);
+  } catch (e) {}
+}
+
+let currentUploadXhr = null;
+let uploadStartTime = 0;
+
+function triggerFileUpload() {
+  const el = document.getElementById("fileUploadInput");
+  if (el) { el.value = ""; el.click(); }
+}
+
+function triggerFolderUpload() {
+  const el = document.getElementById("folderUploadInput");
+  if (el) { el.value = ""; el.click(); }
+}
+
+function handleFileUpload(e) {
+  startUploadingFiles(e.target.files, false);
+}
+
+function handleFolderUpload(e) {
+  startUploadingFiles(e.target.files, true);
+}
+
+function startUploadingFiles(files, isFolder) {
+  if (!files || files.length === 0 || !currentPath) {
+    if (!currentPath) showToast("يرجى اختيار القرص أو المجلد الهدف أولاً");
+    return;
+  }
+
+  const formData = new FormData();
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const relPath = (isFolder && file.webkitRelativePath) ? file.webkitRelativePath : file.name;
+    formData.append("files", file, relPath);
+  }
+  formData.append("target_path", currentPath);
+
+  const token = localStorage.getItem("remote_token") || "";
+  const card = document.getElementById("uploadProgressCard");
+  const pBar = document.getElementById("uploadProgressBar");
+  const pBadge = document.getElementById("uploadPercentBadge");
+  const pStats = document.getElementById("uploadStats");
+  const pSpeed = document.getElementById("uploadSpeed");
+  const pFileName = document.getElementById("uploadFileName");
+
+  if (card) card.style.display = "flex";
+  if (pBar) pBar.style.width = "0%";
+  if (pBadge) pBadge.textContent = "0%";
+  if (pFileName) pFileName.textContent = files.length === 1 ? files[0].name : `${files.length} ملفات / مجلدات`;
+
+  uploadStartTime = Date.now();
+  currentUploadXhr = new XMLHttpRequest();
+  currentUploadXhr.open("POST", `/api/fs/upload?token=${encodeURIComponent(token)}`, true);
+  currentUploadXhr.setRequestHeader("X-Auth-Token", token);
+
+  currentUploadXhr.upload.onprogress = function(event) {
+    if (event.lengthComputable) {
+      const pct = Math.min(100, Math.round((event.loaded / event.total) * 100));
+      const loadedMB = (event.loaded / (1024 * 1024)).toFixed(1);
+      const totalMB = (event.total / (1024 * 1024)).toFixed(1);
+      const elapsed = (Date.now() - uploadStartTime) / 1000;
+      const speedMBs = elapsed > 0 ? (event.loaded / (1024 * 1024) / elapsed).toFixed(1) : "0.0";
+
+      if (pBar) pBar.style.width = pct + "%";
+      if (pBadge) pBadge.textContent = pct + "%";
+      if (pStats) pStats.textContent = `${loadedMB} MB / ${totalMB} MB`;
+      if (pSpeed) pSpeed.textContent = `${speedMBs} MB/s`;
+    }
+  };
+
+  currentUploadXhr.onload = function() {
+    if (card) card.style.display = "none";
+    currentUploadXhr = null;
+    if (this.status >= 200 && this.status < 300) {
+      showToast("✅ تم رفع الملفات بنجاح");
+      openFolder(currentPath);
+    } else {
+      let err = "فشل الرفع";
+      try {
+        const res = JSON.parse(this.responseText);
+        if (res.error) err += ": " + res.error;
+      } catch (e) {}
+      showToast(err);
+    }
+  };
+
+  currentUploadXhr.onerror = function() {
+    if (card) card.style.display = "none";
+    currentUploadXhr = null;
+    showToast("❌ فشل الرفع (انقطع الاتصال)");
+  };
+
+  currentUploadXhr.onabort = function() {
+    if (card) card.style.display = "none";
+    currentUploadXhr = null;
+    showToast("🛑 تم إلغاء عملية الرفع");
+  };
+
+  currentUploadXhr.send(formData);
+}
+
+function cancelActiveUpload() {
+  if (currentUploadXhr) {
+    currentUploadXhr.abort();
+  }
+}
+
+// ------------------------------------------------------------ Media & Volume
+async function sendMediaAction(act) {
+  try { await apiFetch("/api/media/control", { method: "POST", body: JSON.stringify({ action: act }) }); } catch (e) {}
+}
+function onVolumeSliderChange(val) {
+  document.getElementById("volumePercentBadge").textContent = val + "%";
+}
+async function sendVolumePercent(val) {
+  try { await apiFetch("/api/media/control", { method: "POST", body: JSON.stringify({ action: "set_volume", percent: parseInt(val, 10) }) }); } catch (e) {}
+}
+
+// ------------------------------------------------------------ Clipboard
+async function getClipboard() {
+  try {
+    const data = await apiFetch("/api/clipboard");
+    document.getElementById("clipboardText").value = data.text || "";
+    showToast("تم سحب الحافظة");
+  } catch (e) {}
+}
+async function setClipboard() {
+  const text = document.getElementById("clipboardText").value;
+  try {
+    await apiFetch("/api/clipboard", { method: "POST", body: JSON.stringify({ text }) });
+    showToast("تم إرسال الحافظة");
+  } catch (e) {}
+}
+
+// ------------------------------------------------------------ Init
+// Theme Init
+const savedTheme = localStorage.getItem("mobile_theme");
+if (savedTheme) {
+  document.documentElement.setAttribute("data-theme", savedTheme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const nextTheme = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", nextTheme);
+  localStorage.setItem("mobile_theme", nextTheme);
+}
+
+// ------------------------------------------------------------ Connection / Auto-Discovery
+let discoveryTimer = null;
+let pollTimer = null;
+let isClientConnected = false;
+
+function toggleManualConnect() {
+  const form = document.getElementById("manualForm");
+  form.classList.toggle("open");
+}
+
+let pendingServerIp = "";
+let pendingServerPort = 0;
+
+async function connectToServer(ip, port, token) {
+  showToast("جاري الاتصال...");
+  pendingServerIp = ip;
+  pendingServerPort = port;
+  
+  try {
+    const result = await pywebview.api.connect_with_token(ip, port, token || "");
+    if (result.ok) {
+      if (result.needsAuth) {
+        showToast("السيرفر موجود — أدخل بيانات الدخول");
+        showLoginInConnectionScreen(ip, port);
+      } else {
+        onConnected();
+      }
+    } else {
+      showToast("فشل الاتصال: " + (result.error || "السيرفر غير متاح"));
+    }
+  } catch (e) {
+    showToast("فشل الاتصال: " + (e.message || e));
+  }
+}
+
+function showLoginInConnectionScreen(ip, port) {
+  const connScreen = document.getElementById("connectionScreen");
+  // Replace content with login form
+  connScreen.innerHTML = `
+    <div class="conn-logo">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+    </div>
+    <div class="conn-title">تسجيل الدخول</div>
+    <div class="conn-subtitle">${ip}:${port}</div>
+    <div class="conn-manual-form open" style="display:flex">
+      <input class="conn-input" id="loginUser" placeholder="اسم المستخدم" dir="ltr" value="admin">
+      <input class="conn-input" id="loginPass" placeholder="كلمة المرور" dir="ltr" type="password" value="admin">
+      <button class="conn-btn" id="btnDoLogin" onclick="doLogin()">تسجيل الدخول والاتصال</button>
+      <div class="conn-manual-toggle" onclick="location.reload()">العودة للبحث</div>
+    </div>
+  `;
+}
+
+async function doLogin() {
+  const u = document.getElementById("loginUser").value.trim();
+  const p = document.getElementById("loginPass").value.trim();
+  if (!u || !p) { showToast("أدخل اسم المستخدم وكلمة المرور"); return; }
+  
+  const btn = document.getElementById("btnDoLogin");
+  btn.textContent = "جاري الاتصال...";
+  btn.disabled = true;
+  
+  try {
+    const result = await pywebview.api.login(u, p);
+    if (result.ok) {
+      onConnected();
+    } else {
+      showToast(result.error || "فشل تسجيل الدخول");
+      btn.textContent = "تسجيل الدخول والاتصال";
+      btn.disabled = false;
+    }
+  } catch (e) {
+    showToast("خطأ: " + (e.message || e));
+    btn.textContent = "تسجيل الدخول والاتصال";
+    btn.disabled = false;
+  }
+}
+
+function onConnected() {
+  isClientConnected = true;
+  document.getElementById("connectionScreen").classList.add("hidden");
+  if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
+  showToast("تم الاتصال بنجاح ✅");
+  // Hide the old auth card if visible
+  const authCard = document.getElementById("authCard");
+  if (authCard) authCard.style.display = "none";
+  pollStats();
+  pollTimer = setInterval(pollStats, 2000);
+}
+
+async function manualConnect() {
+  const ip = document.getElementById("manualIp").value.trim();
+  const port = parseInt(document.getElementById("manualPort").value.trim() || "8080", 10);
+  const token = document.getElementById("manualToken").value.trim();
+  if (!ip) { showToast("أدخل عنوان IP"); return; }
+  await connectToServer(ip, port, token);
+}
+
+async function scanForServers() {
+  if (!window.pywebview || !window.pywebview.api) return;
+  try {
+    const servers = await pywebview.api.get_discovered_servers();
+    const list = document.getElementById("serversList");
+    if (!list) return;
+
+    // Only update if changed
+    const currentKeys = list.dataset.keys || "";
+    const newKeys = servers.map(s => s.ip + ":" + s.port).join(",");
+    if (currentKeys === newKeys) return;
+    list.dataset.keys = newKeys;
+
+    list.innerHTML = "";
+    for (const s of servers) {
+      const card = document.createElement("div");
+      card.className = "server-card";
+      card.innerHTML = `
+        <div class="server-card-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        </div>
+        <div class="server-card-info">
+          <div class="server-card-name">${s.name}</div>
+          <div class="server-card-ip">${s.ip}:${s.port}</div>
+        </div>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      `;
+      card.onclick = () => connectToServer(s.ip, s.port, "");
+      list.appendChild(card);
+    }
+  } catch (e) {}
+}
+
+// Wait for pywebview bridge to be ready
+function waitForBridge() {
+  if (window.pywebview && window.pywebview.api) {
+    populateTimeOptions();
+    // Start scanning for servers
+    scanForServers();
+    discoveryTimer = setInterval(scanForServers, 2000);
+  } else {
+    setTimeout(waitForBridge, 200);
+  }
+}
+waitForBridge();
+</script>
+</body>
+</html>

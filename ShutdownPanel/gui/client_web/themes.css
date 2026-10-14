@@ -1,0 +1,103 @@
+/* 
+  Themes Definition for Shutdown Panel
+  Include this file to support multiple themes across all windows.
+*/
+
+:root, [data-theme="dark"] {
+  --bg: #070c16;
+  --panel: #0c1424;
+  --panel-2: #101a2e;
+  --stroke: rgba(56, 189, 248, 0.16);
+  --cyan: #22d3ee;
+  --cyan-2: #06b6d4;
+  --text: #e8f4ff;
+  --muted: #7d90a8;
+  --danger: #fb7185;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --radius: 16px;
+}
+
+[data-theme="light"] {
+  --bg: #d7e4f2;
+  --panel: #f4f8fc;
+  --panel-2: #ffffff;
+  --stroke: rgba(8, 80, 120, 0.12);
+  --cyan: #0891b2;
+  --cyan-2: #0e7490;
+  --text: #0f2744;
+  --muted: #5b6f86;
+  --danger: #e11d48;
+  --ok: #059669;
+  --warn: #d97706;
+}
+
+[data-theme="ocean"] {
+  --bg: #031525;
+  --panel: #07223b;
+  --panel-2: #0b2e4d;
+  --stroke: rgba(56, 189, 248, 0.2);
+  --cyan: #38bdf8;
+  --cyan-2: #0284c7;
+  --text: #f0f9ff;
+  --muted: #7dd3fc;
+  --danger: #ef4444;
+  --ok: #10b981;
+  --warn: #f59e0b;
+}
+
+[data-theme="forest"] {
+  --bg: #061f14;
+  --panel: #0a2f1f;
+  --panel-2: #10422d;
+  --stroke: rgba(52, 211, 153, 0.2);
+  --cyan: #34d399;
+  --cyan-2: #059669;
+  --text: #ecfdf5;
+  --muted: #6ee7b7;
+  --danger: #f87171;
+  --ok: #3b82f6;
+  --warn: #fbbf24;
+}
+
+[data-theme="sunset"] {
+  --bg: #2a0a18;
+  --panel: #401021;
+  --panel-2: #5c162c;
+  --stroke: rgba(251, 146, 60, 0.2);
+  --cyan: #fb923c;
+  --cyan-2: #ea580c;
+  --text: #fff7ed;
+  --muted: #fdba74;
+  --danger: #f43f5e;
+  --ok: #10b981;
+  --warn: #facc15;
+}
+
+[data-theme="purple"] {
+  --bg: #140b2e;
+  --panel: #20114a;
+  --panel-2: #2e1866;
+  --stroke: rgba(192, 132, 252, 0.2);
+  --cyan: #c084fc;
+  --cyan-2: #9333ea;
+  --text: #faf5ff;
+  --muted: #d8b4fe;
+  --danger: #fb7185;
+  --ok: #34d399;
+  --warn: #fbbf24;
+}
+
+[data-theme="midnight"] {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #171717;
+  --stroke: rgba(255, 255, 255, 0.15);
+  --cyan: #f8fafc;
+  --cyan-2: #94a3b8;
+  --text: #ffffff;
+  --muted: #94a3b8;
+  --danger: #ef4444;
+  --ok: #10b981;
+  --warn: #eab308;
+}

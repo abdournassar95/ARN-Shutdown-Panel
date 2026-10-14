@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-widget-style="cyber">
+<head>
+  <meta charset="UTF-8">
+  <title>Edge Clock Widget</title>
+  <link rel="stylesheet" href="themes.css">
+  <link href="https://fonts.cdnfonts.com/css/ds-digital" rel="stylesheet">
+  <style>
+    /* Local fonts (bundled) */
+    @font-face {
+      font-family: "DS-Digital";
+      src: url("fonts/ds-digital.woff") format("woff");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Cairo";
+      src: url("fonts/cairo-arabic.woff2") format("woff2");
+      font-weight: 200 1000; font-style: normal; font-display: swap;
+      unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+    }
+    @font-face {
+      font-family: "Cairo";
+      src: url("fonts/cairo-latin.woff2") format("woff2");
+      font-weight: 200 1000; font-style: normal; font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: "Outfit";
+      src: url("fonts/outfit-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      user-select: none; -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: transparent;
+      font-family: "Cairo", "Outfit", system-ui, sans-serif;
+    }
+
+    #drawer {
+      width: 100%; height: 100%;
+      position: absolute; top: 0; left: 0;
+      cursor: pointer;
+    }
+
+    .card {
+      width: 100%; height: 100%;
+      position: relative;
+    }
+
+    .card-inner {
+      position: absolute;
+      inset: 0;
+      background: var(--panel-2, linear-gradient(120deg, #0d1f38 0%, #0a1628 60%, #081120 100%));
+      border: 1.5px solid var(--stroke, rgba(34, 211, 238, 0.45));
+      border-right: none;
+      border-radius: 18px 0 0 18px;
+      overflow: hidden;
+      box-shadow: -4px 0 22px rgba(0, 0, 0, 0.6);
+      transition: border-color 0.25s, box-shadow 0.25s, border-radius 0.25s, background 0.25s;
+    }
+    .card-inner:hover {
+      border-color: var(--cyan, rgba(34, 211, 238, 0.85));
+      box-shadow: -6px 0 28px var(--stroke, rgba(34, 211, 238, 0.35));
+    }
+
+    /* ---- Digital Section (Expanded) ---- */
+    #digitalView {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      gap: 0;
+      z-index: 5;
+      transition: all 0.25s ease;
+    }
+    .time-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 0;
+      line-height: 0.82;
+      direction: ltr;
+    }
+    .time-val {
+      font-family: 'DS-Digital', sans-serif;
+      font-size: 4.8rem;
+      font-weight: 700;
+      color: var(--cyan, #00d2ff);
+      letter-spacing: 2px;
+      line-height: 0.82;
+      margin: 0;
+      padding: 0;
+      text-shadow: 0 0 16px rgba(0, 210, 255, 0.65), 0 0 32px rgba(0, 210, 255, 0.4);
+      transition: all 0.3s ease;
+    }
+    .date-val {
+      font-family: "Cairo", "Segoe UI", system-ui, sans-serif;
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: var(--muted, #94a3b8);
+      margin-top: 1px;
+      line-height: 1;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.02em;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 1px;
+      min-height: 10px;
+      line-height: 1;
+    }
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--ok, #34d399);
+      box-shadow: 0 0 8px var(--ok, #34d399);
+      animation: glow 1.8s ease-in-out infinite;
+    }
+    .status-dot.alert {
+      background: var(--danger, #fb7185);
+      box-shadow: 0 0 8px var(--danger, #fb7185);
+      animation: glow 0.7s ease-in-out infinite;
+    }
+    .status-txt {
+      font-family: "Outfit", "Cairo", system-ui, sans-serif;
+      font-size: 0.62rem;
+      font-weight: 800;
+      color: var(--ok, #34d399);
+      direction: ltr;
+      letter-spacing: 0.04em;
+    }
+    .status-txt.alert {
+      color: var(--danger, #fb7185);
+    }
+
+    /* Sub-elements for alternative designs */
+    .pill-divider { display: none; }
+    .hud-track { display: none; }
+
+    /* ==========================================================================
+       STYLE 1: CYBER (Default Glowing Cyber Glass)
+       ========================================================================== */
+    [data-widget-style="cyber"] .card-inner {
+      border-radius: 18px 0 0 18px;
+    }
+
+    /* ==========================================================================
+       STYLE 2: PILL (Minimalist Glass Capsule)
+       ========================================================================== */
+    [data-widget-style="pill"] .card-inner {
+      border-radius: 39px 0 0 39px;
+      background: rgba(12, 20, 36, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--stroke, rgba(255, 255, 255, 0.14));
+      border-right: none;
+      box-shadow: -6px 0 24px rgba(0, 0, 0, 0.55);
+    }
+    [data-widget-style="pill"] #digitalView {
+      flex-direction: row;
+      justify-content: space-evenly;
+      align-items: center;
+      padding: 0 10px 0 14px;
+      gap: 8px;
+    }
+    [data-widget-style="pill"] .time-val {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--text, #ffffff);
+      text-shadow: none;
+    }
+    [data-widget-style="pill"] .pill-divider {
+      display: block;
+      width: 1px;
+      height: 38px;
+      background: var(--stroke, rgba(255, 255, 255, 0.18));
+      flex-shrink: 0;
+    }
+    [data-widget-style="pill"] .pill-meta-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 3px;
+      overflow: hidden;
+    }
+    [data-widget-style="pill"] .date-val {
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--cyan, #38bdf8);
+      margin-top: 0;
+      max-width: 82px;
+    }
+    [data-widget-style="pill"] .status-row {
+      margin-top: 0;
+      gap: 4px;
+    }
+    [data-widget-style="pill"] .status-txt {
+      font-size: 0.56rem;
+      max-width: 72px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ==========================================================================
+       STYLE 3: HUD (Sci-Fi Tactical Interface)
+       ========================================================================== */
+    [data-widget-style="hud"] .card-inner {
+      border-radius: 0;
+      clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+      background: linear-gradient(135deg, #050b14 0%, #071220 100%);
+      border: 1px solid var(--stroke, rgba(34, 211, 238, 0.4));
+      border-left: 3px solid var(--cyan, #22d3ee);
+      border-right: none;
+      background-image: 
+        linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+      background-size: 8px 8px;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.7);
+    }
+    [data-widget-style="hud"] .time-val {
+      font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace;
+      font-size: 2.15rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--cyan, #22d3ee);
+      text-shadow: 0 0 12px var(--cyan, #22d3ee);
+    }
+    [data-widget-style="hud"] .date-val {
+      font-family: 'Consolas', 'Cairo', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted, #94a3b8);
+    }
+    [data-widget-style="hud"] .status-txt {
+      font-family: 'Consolas', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 1px;
+    }
+    [data-widget-style="hud"] .hud-track {
+      display: block;
+      width: 82%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    [data-widget-style="hud"] .hud-fill {
+      height: 100%;
+      width: 50%;
+      background: var(--cyan, #22d3ee);
+      box-shadow: 0 0 6px var(--cyan, #22d3ee);
+      transition: width 0.9s linear;
+    }
+
+    /* ==========================================================================
+       STYLE 4: LUXURY (Luxury Chrono Neomorphic)
+       ========================================================================== */
+    [data-widget-style="luxury"] .card-inner {
+      border-radius: 20px 0 0 20px;
+      background: radial-gradient(circle at 65% 35%, #141c2a 0%, #090e18 100%);
+      border: 1.5px solid rgba(212, 175, 55, 0.45);
+      border-right: none;
+      box-shadow: 
+        inset 1px 1px 2px rgba(255, 255, 255, 0.18),
+        inset -1px -1px 3px rgba(0, 0, 0, 0.7),
+        -6px 0 26px rgba(0, 0, 0, 0.85);
+    }
+    [data-widget-style="luxury"] .time-val {
+      font-family: 'Outfit', 'Georgia', serif;
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #f7e7c4;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 10px rgba(212, 175, 55, 0.35);
+    }
+    [data-widget-style="luxury"] .date-val {
+      display: inline-block;
+      background: rgba(8, 12, 20, 0.85);
+      border: 1px solid rgba(212, 175, 55, 0.35);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #e5c158;
+      letter-spacing: 0.05em;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+    [data-widget-style="luxury"] .status-dot {
+      background: #e5c158;
+      box-shadow: 0 0 8px #e5c158;
+    }
+    [data-widget-style="luxury"] .status-txt {
+      color: #e5c158;
+      font-size: 0.6rem;
+      font-weight: 700;
+    }
+
+    /* ---- Analog Canvas Section (Locked to left: 0, 64px width tab) ---- */
+    #analogView {
+      position: absolute;
+      top: 0; left: 0;
+      width: 64px; height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #clockCanvas {
+      width: 48px;
+      height: 48px;
+      display: block;
+      filter: drop-shadow(0 0 8px var(--stroke));
+    }
+
+    /* ==========================================================================
+       VISUAL ENHANCEMENTS: shine, ticking, countdown alert states
+       ========================================================================== */
+    /* ALWAYS-ON: blinking colon in the clock */
+    .colon {
+      animation: colonBlink 1s infinite;
+      display: inline-block;
+      width: 0.52em;
+      text-align: center;
+    }
+    @keyframes colonBlink {
+      0%, 49.9%  { opacity: 1;   text-shadow: 0 0 18px rgba(0, 210, 255, 0.95), 0 0 36px rgba(0, 210, 255, 0.6); }
+      50%, 100%  { opacity: 0.18; text-shadow: 0 0 4px rgba(0, 210, 255, 0.3); }
+    }
+
+    /* ALWAYS-ON: flowing light bar along the top edge */
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 20px; right: 0;
+      height: 3px;
+      z-index: 30;
+      background: linear-gradient(90deg, transparent 0%, var(--cyan, #22d3ee) 35%, #ffffff 50%, var(--cyan, #22d3ee) 65%, transparent 100%);
+      background-size: 250% 100%;
+      animation: accentFlow 2.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--cyan, #22d3ee));
+      pointer-events: none;
+    }
+    @keyframes accentFlow {
+      0%   { background-position: 125% 0; }
+      100% { background-position: -125% 0; }
+    }
+    .card:has(.cd-active)::before {
+      background: linear-gradient(90deg, transparent 0%, var(--danger, #fb7185) 35%, #ffffff 50%, var(--danger, #fb7185) 65%, transparent 100%);
+      background-size: 250% 100%;
+      filter: drop-shadow(0 0 6px var(--danger, #fb7185));
+      animation-duration: 1.4s;
+    }
+
+    /* ALWAYS-ON: breathing outer glow */
+    .card {
+      animation: cardBreath 3.5s ease-in-out infinite;
+    }
+    @keyframes cardBreath {
+      0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.15), 0 0 4px rgba(34, 211, 238, 0.1); }
+      50%      { box-shadow: 0 0 26px rgba(34, 211, 238, 0.45), 0 0 10px rgba(34, 211, 238, 0.25); }
+    }
+    .card:has(.cd-active) {
+      animation: cardBreathDanger 1s ease-in-out infinite;
+    }
+    @keyframes cardBreathDanger {
+      0%, 100% { box-shadow: 0 0 14px rgba(251, 113, 133, 0.25); }
+      50%      { box-shadow: 0 0 32px rgba(251, 113, 133, 0.7); }
+    }
+
+    .card-inner::after {
+      content: "";
+      position: absolute;
+      top: -60%;
+      left: -80%;
+      width: 55%;
+      height: 220%;
+      background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.10) 45%, rgba(255,255,255,0.22) 50%, transparent 60%);
+      transform: rotate(14deg) translateX(-140%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+    }
+    .card-inner:hover::after {
+      animation: shineSweep 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes shineSweep {
+      0%   { opacity: 0;   transform: rotate(14deg) translateX(-140%); }
+      15%  { opacity: 1; }
+      100% { opacity: 0;   transform: rotate(14deg) translateX(320%); }
+    }
+
+    .time-val.tick-pop {
+      animation: tickPop 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes tickPop {
+      0%   { transform: scale(1);    filter: brightness(1); }
+      35%  { transform: scale(1.045); filter: brightness(1.5); }
+      100% { transform: scale(1);    filter: brightness(1); }
+    }
+
+    .date-val, .status-txt { transition: color 0.25s, opacity 0.25s; }
+    .status-txt.swap { animation: softFade 0.35s ease; }
+    @keyframes softFade {
+      0% { opacity: 0; transform: translateY(3px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Countdown active state on the card */
+    .card-inner.cd-active {
+      border-color: rgba(251, 113, 133, 0.75) !important;
+      box-shadow: -5px 0 26px rgba(251, 113, 133, 0.30),
+                  -4px 0 22px rgba(0, 0, 0, 0.6);
+    }
+    .card-inner.cd-active:hover {
+      border-color: rgba(251, 113, 133, 0.95) !important;
+      box-shadow: -7px 0 34px rgba(251, 113, 133, 0.45),
+                  -4px 0 22px rgba(0, 0, 0, 0.6);
+    }
+    /* Critical state: last minute */
+    .card-inner.cd-active.cd-critical {
+      animation: cdCriticalPulse 0.9s ease-in-out infinite;
+    }
+    @keyframes cdCriticalPulse {
+      0%, 100% {
+        border-color: rgba(251, 113, 133, 0.55);
+        box-shadow: -5px 0 22px rgba(0,0,0,0.6), -3px 0 18px rgba(251,113,133,0.20);
+      }
+      50% {
+        border-color: rgba(251, 113, 133, 1);
+        box-shadow: -6px 0 34px rgba(0,0,0,0.6), -6px 0 42px rgba(251,113,133,0.65);
+      }
+    }
+    .card-inner.cd-critical .status-dot.alert {
+      animation: glow 0.4s ease-in-out infinite;
+    }
+    .card-inner.cd-critical .status-txt.alert {
+      animation: txtBlink 0.9s steps(2, jump-none) infinite;
+    }
+    @keyframes txtBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+    /* HUD bar: gradient + flowing glow */
+    .hud-fill {
+      background: linear-gradient(90deg, var(--cyan-2, #06b6d4), var(--cyan, #22d3ee), #a5f3fc);
+      background-size: 200% 100%;
+      animation: hudFlow 2.4s linear infinite;
+      box-shadow: 0 0 6px var(--cyan, #22d3ee), 0 0 14px rgba(34, 211, 238, 0.4);
+    }
+    @keyframes hudFlow {
+      0%   { background-position: 0% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* Luxury: gold shimmer on the time */
+    [data-widget-style="luxury"] .time-val {
+      background: linear-gradient(100deg, #f7e7c4 20%, #fff6dc 38%, #e5c158 50%, #f7e7c4 65%);
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: goldShimmer 4.5s ease-in-out infinite;
+    }
+    @keyframes goldShimmer {
+      0%, 100% { background-position: 0% 0; }
+      50%      { background-position: 100% 0; }
+    }
+
+    /* Pill: glass highlight line */
+    [data-widget-style="pill"] .card-inner::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 8%; right: 26%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    /* Cyber: animated grid drift */
+    [data-widget-style="cyber"] .card-inner {
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.045) 1px, transparent 1px);
+      background-size: 22px 22px;
+      animation: gridDrift 14s linear infinite;
+    }
+    @keyframes gridDrift {
+      0%   { background-position: 0 0, 0 0; }
+      100% { background-position: 22px 22px, 22px 22px; }
+    }
+
+    /* Analog view: soft breathing glow behind the face */
+    #analogView::after {
+      content: "";
+      position: absolute;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.28) 0%, transparent 70%);
+      animation: breathe 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50%      { transform: scale(1.1);  opacity: 0.9; }
+    }
+
+    @keyframes glow {
+      0%, 100% { opacity: 0.35; }
+      50%      { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="drawer" title="انقر مزدوجاً لفتح اللوحة • انقر يميناً لتغيير المظهر">
+    <div class="card">
+      <div class="card-inner">
+
+        <!-- Digital view (Expanded default) -->
+        <div id="digitalView">
+          <div class="time-row">
+            <div class="time-val" id="tval"><span id="tHour">00</span><span class="colon">:</span><span id="tMin">00</span></div>
+          </div>
+
+          <!-- Divider for pill layout -->
+          <div class="pill-divider"></div>
+
+          <!-- Meta Column (Date + Status) -->
+          <div class="pill-meta-col">
+            <div class="date-val" id="dval">—</div>
+            <div class="status-row">
+              <span class="status-dot" id="sdot"></span>
+              <span class="status-txt" id="stxt">ABDOU NASSAR</span>
+            </div>
+          </div>
+
+          <!-- Seconds progress bar for HUD style -->
+          <div class="hud-track">
+            <div class="hud-fill" id="hudFill"></div>
+          </div>
+        </div>
+
+        <!-- Analog Canvas clock view (Collapsed 64px tab) -->
+        <div id="analogView">
+          <canvas id="clockCanvas" width="96" height="96"></canvas>
+        </div>
+
+      </div> <!-- card-inner -->
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+    const WIDGET_STYLES = ["cyber", "pill", "hud", "luxury"];
+    let currentWidgetStyle = "cyber";
+    let collapsed = false;
+    let clickTimer = null;
+    let lang = "ar";
+
+    const DAYS_AR = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+    const DAYS_EN = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const MONTHS_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+    const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+
+    window.setWidgetStyle = function(style) {
+      if (!WIDGET_STYLES.includes(style)) style = "cyber";
+      currentWidgetStyle = style;
+      document.documentElement.setAttribute("data-widget-style", style);
+    };
+
+    function cycleWidgetStyle() {
+      const idx = WIDGET_STYLES.indexOf(currentWidgetStyle);
+      const nextStyle = WIDGET_STYLES[(idx + 1) % WIDGET_STYLES.length];
+      window.setWidgetStyle(nextStyle);
+      if (window.pywebview && window.pywebview.api) {
+        try {
+          window.pywebview.api.get_settings().then(s => {
+            const updated = Object.assign({}, s, { widgetStyle: nextStyle });
+            window.pywebview.api.set_settings(updated);
+          });
+        } catch(e) {}
+      }
+    }
+
+    // Right-click fast style switcher
+    window.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      cycleWidgetStyle();
+    });
+
+    function drawClock() {
+      const canvas = document.getElementById("clockCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const r = (w / 2) - 5;
+
+      const style = getComputedStyle(document.documentElement);
+      const cyan = style.getPropertyValue('--cyan').trim() || '#22d3ee';
+      const danger = style.getPropertyValue('--danger').trim() || '#fb7185';
+      const panel = style.getPropertyValue('--panel').trim() || '#112240';
+      const bg = style.getPropertyValue('--bg').trim() || '#060c1a';
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Background circle
+      const grad = ctx.createRadialGradient(cx * 0.8, cy * 0.8, 2, cx, cy, r);
+      grad.addColorStop(0, panel);
+      grad.addColorStop(1, bg);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Glowing Outer border
+      ctx.strokeStyle = cyan;
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = cyan;
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // 4 Cardinal tick marks (12, 3, 6, 9)
+      ctx.strokeStyle = cyan;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      for (let i = 0; i < 4; i++) {
+        const angle = (i * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + (r - 8) * Math.cos(angle), cy + (r - 8) * Math.sin(angle));
+        ctx.lineTo(cx + (r - 2) * Math.cos(angle), cy + (r - 2) * Math.sin(angle));
+        ctx.stroke();
+      }
+
+      // Time calculation
+      const now = new Date();
+      const secs = now.getSeconds() + now.getMilliseconds() / 1000;
+      const mins = now.getMinutes() + secs / 60;
+      const hrs = (now.getHours() % 12) + mins / 60;
+
+      // Hour hand (White)
+      const hAngle = (hrs * Math.PI / 6) - (Math.PI / 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (r * 0.5) * Math.cos(hAngle), cy + (r * 0.5) * Math.sin(hAngle));
+      ctx.stroke();
+
+      // Minute hand (Primary color)
+      const mAngle = (mins * Math.PI / 30) - (Math.PI / 2);
+      ctx.strokeStyle = cyan;
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (r * 0.72) * Math.cos(mAngle), cy + (r * 0.72) * Math.sin(mAngle));
+      ctx.stroke();
+
+      // Second hand (Danger color)
+      const sAngle = (secs * Math.PI / 30) - (Math.PI / 2);
+      ctx.strokeStyle = danger;
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx - (r * 0.15) * Math.cos(sAngle), cy - (r * 0.15) * Math.sin(sAngle));
+      ctx.lineTo(cx + (r * 0.82) * Math.cos(sAngle), cy + (r * 0.82) * Math.sin(sAngle));
+      ctx.stroke();
+
+      // Center pin
+      ctx.fillStyle = cyan;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function popSecond(el) {
+      if (!el) return;
+      el.classList.remove("tick-pop");
+      void el.offsetWidth;
+      el.classList.add("tick-pop");
+      clearTimeout(el._popT);
+      el._popT = setTimeout(() => el.classList.remove("tick-pop"), 360);
+    }
+
+    function tick() {
+      const n = new Date();
+      let h = n.getHours() % 12 || 12;
+      const tval = document.getElementById("tval");
+      const hEl = document.getElementById("tHour");
+      const mEl = document.getElementById("tMin");
+      if (hEl) hEl.textContent = pad(h);
+      if (mEl) mEl.textContent = pad(n.getMinutes());
+      if (tval) popSecond(tval);
+
+      const DAYS = lang === "ar" ? DAYS_AR : DAYS_EN;
+      const MONTHS = lang === "ar" ? MONTHS_AR : MONTHS_EN;
+      const dval = document.getElementById("dval");
+      if (dval) {
+        dval.textContent =
+          DAYS[n.getDay()] + (lang === "ar" ? "، " : ", ") + n.getDate() + " " + MONTHS[n.getMonth()];
+      }
+
+      // Update HUD seconds progress bar
+      const hudFill = document.getElementById("hudFill");
+      if (hudFill) {
+        const secPct = (n.getSeconds() / 59) * 100;
+        hudFill.style.width = secPct + "%";
+      }
+
+      if (!collapsed) drawClock();
+    }
+    setInterval(tick, 1000);
+    tick();
+
+    // Smooth sweeping second hand while the analog view is visible
+    setInterval(() => { if (collapsed) drawClock(); }, 120);
+
+    window.setCollapsedUI = function(isCollapsed) {
+      collapsed = isCollapsed;
+      const dView = document.getElementById("digitalView");
+      const aView = document.getElementById("analogView");
+      if (collapsed) {
+        if (dView) dView.style.display = "none";
+        if (aView) aView.style.display = "flex";
+        drawClock();
+      } else {
+        if (dView) dView.style.display = "flex";
+        if (aView) aView.style.display = "none";
+      }
+    };
+
+    // Countdown status
+    window.__onCountdownTick = function (state) {
+      const el = document.getElementById("stxt");
+      const dot = document.getElementById("sdot");
+      const cardInner = document.querySelector(".card-inner");
+      const active = state && state.action && state.remainingSecs > 0;
+      if (active) {
+        const r = state.remainingSecs;
+        const txt = [Math.floor(r / 3600), Math.floor((r % 3600) / 60), r % 60].map(pad).join(":");
+        if (el && el.textContent !== txt) {
+          el.textContent = txt;
+          el.classList.remove("swap");
+          void el.offsetWidth;
+          el.classList.add("swap");
+        }
+        if (el) el.classList.add("alert");
+        if (dot) dot.classList.add("alert");
+        if (cardInner) {
+          cardInner.classList.add("cd-active");
+          cardInner.classList.toggle("cd-critical", r <= 60);
+        }
+      } else {
+        if (el && el.textContent !== "ABDOU NASSAR") {
+          el.textContent = "ABDOU NASSAR";
+          el.classList.remove("swap");
+          void el.offsetWidth;
+          el.classList.add("swap");
+        }
+        if (el) el.classList.remove("alert");
+        if (dot) dot.classList.remove("alert");
+        if (cardInner) {
+          cardInner.classList.remove("cd-active", "cd-critical");
+        }
+      }
+    };
+
+    async function pollStatus() {
+      try {
+        if (window.pywebview && window.pywebview.api) {
+          const st = await window.pywebview.api.countdown_state();
+          if (st && st.remainingSecs > 0) window.__onCountdownTick(st);
+          else window.__onCountdownTick(null);
+        }
+      } catch (e) {}
+    }
+    setInterval(pollStatus, 2000);
+    pollStatus();
+
+    // Load theme, language, and widgetStyle preference from settings
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_settings().then(s => {
+          lang = (s && s.language) || "ar";
+          document.documentElement.lang = lang;
+          document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+          if (s && s.theme) {
+            document.documentElement.setAttribute("data-theme", s.theme);
+          }
+          if (s && s.widgetStyle) {
+            window.setWidgetStyle(s.widgetStyle);
+          }
+          tick();
+          pollStatus();
+        });
+      }
+    } catch (e) {}
+
+    const drawer = document.getElementById("drawer");
+    let isDragging = false;
+    let startY = 0;
+    let initialWinY = 0;
+    let moved = false;
+
+    if (drawer) {
+      drawer.addEventListener("mousedown", async (e) => {
+        if (e.button !== 0) return; // Only left click for drag
+        isDragging = true;
+        moved = false;
+        startY = e.screenY;
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            initialWinY = await window.pywebview.api.get_widget_y();
+          }
+        } catch(err) {}
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const delta = e.screenY - startY;
+        if (Math.abs(delta) > 3) {
+          moved = true;
+          try {
+            if (window.pywebview && window.pywebview.api) {
+              window.pywebview.api.move_widget_y(initialWinY + delta);
+            }
+          } catch(err) {}
+        }
+      });
+
+      window.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+
+      window.addEventListener("mouseleave", () => {
+        isDragging = false;
+      });
+
+      drawer.addEventListener("click", (e) => {
+        if (e.button !== 0) return;
+        if (moved) {
+          moved = false;
+          e.preventDefault();
+          return;
+        }
+        if (clickTimer) {
+          clearTimeout(clickTimer);
+          clickTimer = null;
+          try {
+            if (window.pywebview && window.pywebview.api) {
+              window.pywebview.api.show_main_window();
+            }
+          } catch (e) {}
+        } else {
+          clickTimer = setTimeout(async () => {
+            clickTimer = null;
+            setCollapsedUI(!collapsed);
+            try {
+              if (window.pywebview && window.pywebview.api) {
+                await window.pywebview.api.toggle_widget_mode(collapsed);
+              }
+            } catch (e) {
+              console.error("toggle_widget_mode failed:", e);
+            }
+          }, 220);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

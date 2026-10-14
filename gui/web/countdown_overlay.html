@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-countdown-style="hud">
+<head>
+  <meta charset="UTF-8">
+  <title>Countdown Overlay</title>
+  <link rel="stylesheet" href="themes.css">
+  <link href="https://fonts.cdnfonts.com/css/ds-digital" rel="stylesheet">
+  <style>
+    /* Local fonts */
+    @font-face {
+      font-family: "DS-Digital";
+      src: url("fonts/ds-digital.woff") format("woff");
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Cairo";
+      src: url("fonts/cairo-arabic.woff2") format("woff2");
+      font-weight: 200 1000; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: "Outfit";
+      src: url("fonts/outfit-latin.woff2") format("woff2");
+      font-weight: 100 900; font-style: normal; font-display: swap;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: "Cairo", "Outfit", system-ui, sans-serif;
+    }
+
+    /* Base Top-Docked Card */
+    .card {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--panel, linear-gradient(180deg, #070e1b 0%, #0a1628 50%, #0d1f38 100%));
+      border: 1.5px solid var(--stroke, rgba(34, 211, 238, 0.5));
+      border-top: none;
+      border-radius: 0 0 18px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 4px 16px 8px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8),
+                  0 0 25px var(--stroke, rgba(34, 211, 238, 0.2)),
+                  inset 0 1px 0 var(--stroke, rgba(34, 211, 238, 0.6));
+      cursor: pointer;
+      overflow: hidden;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .card:hover {
+      border-color: var(--danger, rgba(251, 113, 133, 0.8));
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85),
+                  0 0 35px var(--danger, rgba(251, 113, 133, 0.3)),
+                  inset 0 1px 0 var(--danger, rgba(251, 113, 133, 0.6));
+    }
+
+    .card:hover .action-label {
+      color: var(--danger, #fb7185);
+    }
+    .card:hover .action-label::after {
+      content: " • اضغط للإلغاء";
+      color: var(--danger, #fb7185);
+      font-weight: 800;
+    }
+    html[dir="ltr"] .card:hover .action-label::after {
+      content: " • Click to cancel";
+    }
+
+    /* Top Action Label & Icon */
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      line-height: 1;
+    }
+    .action-icon {
+      font-size: 0.75rem;
+      color: var(--cyan, #22d3ee);
+      line-height: 1;
+    }
+    .action-label {
+      font-family: "Cairo", "Segoe UI", system-ui, sans-serif;
+      font-size: 0.64rem;
+      font-weight: 800;
+      color: var(--muted, #94a3b8);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+
+    /* Main Glowing Digital Timer */
+    .time-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      direction: ltr;
+      line-height: 1;
+    }
+    .timer {
+      font-family: 'DS-Digital', sans-serif;
+      font-size: 3.1rem;
+      font-weight: 700;
+      color: #00d2ff;
+      letter-spacing: 2px;
+      line-height: 0.85;
+      text-shadow: 0 0 16px rgba(0, 210, 255, 0.65), 0 0 32px rgba(0, 210, 255, 0.4);
+      text-align: center;
+      transition: color 0.3s, text-shadow 0.3s;
+    }
+
+    /* Progress Bar Capsule (Standard) */
+    .bar-container {
+      width: 100%;
+      height: 8px;
+      background: var(--bg, #040913);
+      border: 1px solid var(--stroke, rgba(0, 229, 255, 0.35));
+      border-radius: 999px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+      margin-top: 1px;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 999px;
+      background: var(--cyan, #00f2fe);
+      box-shadow: 0 0 12px var(--stroke);
+      position: relative;
+      transition: width 0.8s linear, background 0.3s;
+    }
+    .bar-fill::after {
+      content: "";
+      position: absolute;
+      right: 1px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 6px #00f2fe, 0 0 12px #ffffff;
+    }
+
+    /* Sub-containers for specialized styles */
+    .island-layout { display: none; }
+    .reactor-grid { display: none; }
+    .laser-track { display: none; }
+
+    /* ==========================================================================
+       STYLE 1: HUD (Default Linear Bar HUD)
+       ========================================================================== */
+    [data-countdown-style="hud"] .bar-container {
+      display: block;
+    }
+
+    /* ==========================================================================
+       STYLE 2: ISLAND (Dynamic Island with Radial Progress Ring)
+       ========================================================================== */
+    [data-countdown-style="island"] .card {
+      border-radius: 0 0 24px 24px;
+      background: #020611;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-top: none;
+      box-shadow: 0 14px 35px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      padding: 4px 16px;
+    }
+    [data-countdown-style="island"] .action-row,
+    [data-countdown-style="island"] .time-row,
+    [data-countdown-style="island"] .bar-container {
+      display: none;
+    }
+    [data-countdown-style="island"] .island-layout {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      height: 100%;
+      gap: 12px;
+      direction: ltr;
+    }
+    .island-ring-box {
+      position: relative;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .island-ring-svg {
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 6px var(--cyan, #00f2fe));
+    }
+    .ring-bg {
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 3.5;
+    }
+    .ring-val {
+      stroke: var(--cyan, #00f2fe);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      stroke-dasharray: 113.1;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.8s linear, stroke 0.3s;
+    }
+    .island-icon {
+      position: absolute;
+      font-size: 1rem;
+      color: var(--cyan, #00f2fe);
+      line-height: 1;
+    }
+    .island-info-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    .island-timer {
+      font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Outfit', monospace;
+      font-size: 2.1rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: var(--cyan, #00f2fe);
+      line-height: 1;
+      letter-spacing: 1px;
+    }
+    .island-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .island-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: var(--muted, #94a3b8);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .island-cancel-badge {
+      font-size: 0.55rem;
+      font-weight: 800;
+      color: #ffffff;
+      background: rgba(251, 113, 133, 0.25);
+      border: 1px solid rgba(251, 113, 133, 0.45);
+      padding: 1px 6px;
+      border-radius: 999px;
+    }
+
+    /* ==========================================================================
+       STYLE 3: REACTOR (Sci-Fi Segmented Energy Reactor)
+       ========================================================================== */
+    [data-countdown-style="reactor"] .card {
+      border-radius: 0;
+      clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 16px 100%);
+      background: linear-gradient(180deg, #050b14 0%, #03060c 100%);
+      border: 1.5px solid var(--cyan, #22d3ee);
+      border-top: none;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9), 0 0 20px rgba(34, 211, 238, 0.25);
+      padding: 2px 24px 6px 24px;
+    }
+    [data-countdown-style="reactor"] .timer {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 2.15rem;
+      letter-spacing: 2px;
+      color: var(--cyan, #22d3ee);
+      text-shadow: 0 0 14px var(--cyan, #22d3ee);
+    }
+    [data-countdown-style="reactor"] .bar-container {
+      display: none;
+    }
+    [data-countdown-style="reactor"] .reactor-grid {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      width: 88%;
+      height: 6px;
+      margin-top: 1px;
+    }
+    .reactor-cell {
+      flex: 1;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 1px;
+      transition: all 0.3s ease;
+    }
+    .reactor-cell.active {
+      background: var(--cyan, #22d3ee);
+      box-shadow: 0 0 6px var(--cyan, #22d3ee);
+    }
+
+    /* ==========================================================================
+       STYLE 4: PILL (Floating Minimalist Glass Pill)
+       ========================================================================== */
+    [data-countdown-style="pill"] .card {
+      border-radius: 0 0 26px 26px;
+      background: rgba(8, 14, 26, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--stroke, rgba(255, 255, 255, 0.15));
+      border-top: none;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+      padding: 4px 18px 6px 18px;
+    }
+    [data-countdown-style="pill"] .bar-container {
+      display: none;
+    }
+    [data-countdown-style="pill"] .laser-track {
+      display: block;
+      width: 100%;
+      height: 2.5px;
+      background: rgba(255, 255, 255, 0.08);
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      overflow: hidden;
+    }
+    [data-countdown-style="pill"] .laser-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--cyan, #00f2fe);
+      box-shadow: 0 0 8px var(--cyan, #00f2fe);
+      transition: width 0.8s linear;
+    }
+    [data-countdown-style="pill"] .timer {
+      font-size: 2.1rem;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-shadow: none;
+      color: var(--text, #ffffff);
+    }
+
+    /* ==========================================================================
+       VISUAL ENHANCEMENTS: sheen, breathing, digit pop, flowing bars
+       ========================================================================== */
+    /* Calm breathing glow while counting down */
+    .card {
+      animation: calmBreath 3.6s ease-in-out infinite;
+    }
+    @keyframes calmBreath {
+      0%, 100% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8),
+                    0 0 18px var(--stroke, rgba(34, 211, 238, 0.15)),
+                    inset 0 1px 0 var(--stroke, rgba(34, 211, 238, 0.6));
+      }
+      50% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8),
+                    0 0 34px var(--stroke, rgba(34, 211, 238, 0.42)),
+                    inset 0 1px 0 var(--stroke, rgba(34, 211, 238, 0.85));
+      }
+    }
+
+    /* Seconds pop on the digits */
+    .timer.tick-pop,
+    .island-timer.tick-pop {
+      animation: digitPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-block;
+    }
+    @keyframes digitPop {
+      0%   { transform: scale(1);    filter: brightness(1); }
+      35%  { transform: scale(1.06); filter: brightness(1.55); }
+      100% { transform: scale(1);    filter: brightness(1); }
+    }
+
+    /* Press feedback when cancelling */
+    .card.pressed {
+      transform: scale(0.975);
+      filter: brightness(1.35);
+    }
+    .card { transition: transform 0.12s ease, filter 0.12s ease,
+                        border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        background 0.25s; }
+
+    /* Bar fill: gradient + moving sheen */
+    .bar-fill {
+      background: linear-gradient(90deg, var(--cyan-2, #06b6d4), var(--cyan, #00f2fe), #bafaff);
+      background-size: 220% 100%;
+      animation: barFlow 2.6s linear infinite;
+      overflow: hidden;
+    }
+    @keyframes barFlow {
+      0%   { background-position: 0% 0; }
+      100% { background-position: 220% 0; }
+    }
+
+    /* Laser: flowing energy wire */
+    .laser-fill {
+      background: linear-gradient(90deg, transparent, var(--cyan, #00f2fe) 35%, #ffffff 50%, var(--cyan, #00f2fe) 65%, transparent);
+      background-size: 250% 100%;
+      animation: laserFlow 1.6s linear infinite;
+    }
+    @keyframes laserFlow {
+      0%   { background-position: 125% 0; }
+      100% { background-position: -125% 0; }
+    }
+
+    /* Reactor cells: staggered live glow */
+    .reactor-cell.active {
+      animation: cellGlow 1.4s ease-in-out infinite;
+    }
+    .reactor-cell:nth-child(2n).active  { animation-delay: 0.15s; }
+    .reactor-cell:nth-child(3n).active  { animation-delay: 0.30s; }
+    .reactor-cell:nth-child(4n).active  { animation-delay: 0.45s; }
+    .reactor-cell:nth-child(5n).active  { animation-delay: 0.60s; }
+    @keyframes cellGlow {
+      0%, 100% { filter: brightness(0.85); box-shadow: 0 0 4px var(--cyan, #22d3ee); }
+      50%      { filter: brightness(1.45); box-shadow: 0 0 12px var(--cyan, #22d3ee); }
+    }
+
+    /* Island ring: soft pulse + glow */
+    .island-ring-svg {
+      animation: ringPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes ringPulse {
+      0%, 100% { filter: drop-shadow(0 0 4px var(--cyan, #00f2fe)); }
+      50%      { filter: drop-shadow(0 0 10px var(--cyan, #00f2fe)); }
+    }
+    .island-cancel-badge { transition: background 0.2s, border-color 0.2s, transform 0.2s; }
+    .card:hover .island-cancel-badge {
+      background: rgba(251, 113, 133, 0.45);
+      border-color: rgba(251, 113, 133, 0.9);
+      transform: translateY(-1px);
+    }
+
+    /* ==========================================================================
+       URGENT STATES (< 60s)
+       ========================================================================== */
+    .card.urgent {
+      border-color: var(--danger, #fb7185) !important;
+      animation: urgentPulse 0.9s ease-in-out infinite;
+    }
+    .card.urgent .timer,
+    .card.urgent .island-timer {
+      color: var(--danger, #fb7185) !important;
+      text-shadow: 0 0 16px var(--danger, #fb7185) !important;
+    }
+    .card.urgent .action-icon,
+    .card.urgent .action-label,
+    .card.urgent .island-icon,
+    .card.urgent .island-label {
+      color: var(--danger, #fb7185) !important;
+    }
+    .card.urgent .bar-container {
+      border-color: var(--danger, rgba(251, 113, 133, 0.5));
+      height: 10px;
+    }
+    .card.urgent .bar-fill {
+      background: linear-gradient(90deg, #ff9aa8, var(--danger, #fb7185), #ffe1e6);
+      background-size: 220% 100%;
+      animation: barFlow 1.4s linear infinite, urgentStripes 0.7s linear infinite;
+      box-shadow: 0 0 14px var(--danger, rgba(251, 113, 133, 0.85));
+    }
+    @keyframes urgentStripes {
+      0%   { filter: brightness(1); }
+      50%  { filter: brightness(1.45); }
+      100% { filter: brightness(1); }
+    }
+    .card.urgent .timer,
+    .card.urgent .island-timer {
+      animation: urgentBlink 1s ease-in-out infinite;
+    }
+    @keyframes urgentBlink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
+    .card.urgent .island-ring-svg {
+      animation: urgentSpinGlow 1.2s linear infinite;
+    }
+    @keyframes urgentSpinGlow {
+      0%, 100% { filter: drop-shadow(0 0 5px var(--danger, #fb7185)); }
+      50%      { filter: drop-shadow(0 0 14px var(--danger, #fb7185)); }
+    }
+    .card.urgent .laser-fill {
+      background: linear-gradient(90deg, transparent, var(--danger, #fb7185) 35%, #ffffff 50%, var(--danger, #fb7185) 65%, transparent);
+      background-size: 250% 100%;
+      animation: laserFlow 0.9s linear infinite;
+    }
+    .card.urgent .ring-val {
+      stroke: var(--danger, #fb7185) !important;
+      filter: drop-shadow(0 0 6px var(--danger, #fb7185));
+      transition: stroke-dashoffset 0.8s linear, stroke 0.3s;
+    }
+    .card.urgent .reactor-cell.active {
+      background: var(--danger, #fb7185) !important;
+      animation: urgentCellGlow 0.7s ease-in-out infinite;
+    }
+    @keyframes urgentCellGlow {
+      0%, 100% { filter: brightness(0.9); box-shadow: 0 0 5px var(--danger, #fb7185); }
+      50%      { filter: brightness(1.6); box-shadow: 0 0 14px var(--danger, #fb7185); }
+    }
+
+    /* ==========================================================================
+       CRITICAL STATE (< 10s): final dramatic warning
+       ========================================================================== */
+    .card.critical {
+      animation: criticalFlash 0.5s ease-in-out infinite;
+      background: linear-gradient(180deg, #1d050c 0%, #2b0710 50%, #3a0a14 100%) !important;
+    }
+    @keyframes criticalFlash {
+      0%, 100% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9),
+                    0 0 25px rgba(251, 113, 133, 0.35);
+        border-color: rgba(251, 113, 133, 0.7);
+      }
+      50% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9),
+                    0 0 65px rgba(251, 113, 133, 0.9);
+        border-color: rgba(251, 113, 133, 1);
+      }
+    }
+    .card.critical .timer,
+    .card.critical .island-timer {
+      animation: criticalBlink 0.5s steps(2, jump-none) infinite;
+      font-weight: 800;
+    }
+    @keyframes criticalBlink {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    .card.critical .action-row {
+      animation: criticalBlink 0.5s steps(2, jump-none) infinite;
+    }
+
+    @keyframes urgentPulse {
+      0%, 100% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 25px rgba(251, 113, 133, 0.2);
+      }
+      50% {
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 55px rgba(251, 113, 133, 0.6);
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="card" id="card" title="اضغط للإلغاء • انقر يميناً لتغيير التصميم">
+
+  <!-- Style 1 & Default Components -->
+  <div class="action-row" id="actionRow">
+    <span class="action-icon" id="actionIcon">⏻</span>
+    <span class="action-label" id="lbl">إيقاف التشغيل</span>
+  </div>
+  <div class="time-row" id="timeRow">
+    <div class="timer" id="timer">00:00</div>
+  </div>
+  <div class="bar-container" id="barContainer">
+    <div class="bar-fill" id="bar"></div>
+  </div>
+
+  <!-- Style 2: Dynamic Island Layout -->
+  <div class="island-layout" id="islandLayout">
+    <div class="island-ring-box">
+      <svg class="island-ring-svg" width="46" height="46" viewBox="0 0 46 46">
+        <circle class="ring-bg" cx="23" cy="23" r="18" fill="none" />
+        <circle class="ring-val" id="ringProgress" cx="23" cy="23" r="18" fill="none" />
+      </svg>
+      <span class="island-icon" id="islandIcon">⏻</span>
+    </div>
+    <div class="island-info-col">
+      <div class="island-timer" id="islandTimer">00:00</div>
+      <div class="island-meta">
+        <span class="island-label" id="islandLabel">إيقاف التشغيل</span>
+        <span class="island-cancel-badge">إلغاء ✖</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Style 3: Reactor Segmented Grid -->
+  <div class="reactor-grid" id="reactorGrid">
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+    <div class="reactor-cell active"></div>
+  </div>
+
+  <!-- Style 4: Laser bottom wire -->
+  <div class="laser-track" id="laserTrack">
+    <div class="laser-fill" id="laserFill"></div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+const COUNTDOWN_STYLES = ["hud", "island", "reactor", "pill"];
+let currentCountdownStyle = "hud";
+
+const timer       = document.getElementById("timer");
+const bar         = document.getElementById("bar");
+const card        = document.getElementById("card");
+const lbl         = document.getElementById("lbl");
+const aIcon       = document.getElementById("actionIcon");
+const ringProg    = document.getElementById("ringProgress");
+const islandTimer = document.getElementById("islandTimer");
+const islandLbl   = document.getElementById("islandLabel");
+const islandIcon  = document.getElementById("islandIcon");
+const laserFill   = document.getElementById("laserFill");
+const reactorGrid = document.getElementById("reactorGrid");
+
+const ICONS = {
+  shutdown: "⏻",
+  restart: "🔄",
+  display_off: "📺",
+  sleep: "🌙",
+  logout: "🚪",
+  lock: "🔒"
+};
+
+const LABELS_AR = {
+  shutdown: "إيقاف التشغيل",
+  restart: "إعادة التشغيل",
+  display_off: "إطفاء الشاشة",
+  sleep: "وضع النوم",
+  logout: "تسجيل الخروج",
+  lock: "قفل الشاشة"
+};
+
+const LABELS_EN = {
+  shutdown: "Shutdown",
+  restart: "Restart",
+  display_off: "Turn off display",
+  sleep: "Sleep",
+  logout: "Logout",
+  lock: "Lock Screen"
+};
+
+function pad(n) { return String(n).padStart(2, "0"); }
+function fmt(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sc = s % 60;
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sc)}` : `${pad(m)}:${pad(sc)}`;
+}
+function popDigit(el) {
+  if (!el) return;
+  el.classList.remove("tick-pop");
+  void el.offsetWidth;
+  el.classList.add("tick-pop");
+  clearTimeout(el._popT);
+  el._popT = setTimeout(() => el.classList.remove("tick-pop"), 330);
+}
+
+let total = 0;
+let lastPct = 1;
+
+window.setCountdownStyle = function(style) {
+  if (!COUNTDOWN_STYLES.includes(style)) style = "hud";
+  currentCountdownStyle = style;
+  document.documentElement.setAttribute("data-countdown-style", style);
+};
+
+function cycleCountdownStyle() {
+  const idx = COUNTDOWN_STYLES.indexOf(currentCountdownStyle);
+  const nextStyle = COUNTDOWN_STYLES[(idx + 1) % COUNTDOWN_STYLES.length];
+  window.setCountdownStyle(nextStyle);
+  if (window.pywebview && window.pywebview.api) {
+    try {
+      window.pywebview.api.get_settings().then(s => {
+        const updated = Object.assign({}, s, { countdownStyle: nextStyle });
+        window.pywebview.api.set_settings(updated);
+      });
+    } catch(e) {}
+  }
+}
+
+// Right-click fast style switcher
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  cycleCountdownStyle();
+});
+
+window.__onCountdownTick = function(state) {
+  if (!state || typeof state.remainingSecs !== "number") return;
+  const r   = Math.max(0, state.remainingSecs);
+  const lng = state.lang || "ar";
+  const act = state.action || "shutdown";
+
+  document.documentElement.lang = lng;
+  document.documentElement.dir = (lng === "ar" ? "rtl" : "ltr");
+  if (state.theme) {
+    document.documentElement.setAttribute("data-theme", state.theme);
+  }
+  if (state.style) {
+    window.setCountdownStyle(state.style);
+  }
+
+  if (state.totalSecs && state.totalSecs > 0) {
+    total = state.totalSecs;
+  } else if (total === 0 || r > total) {
+    total = r;
+  }
+
+  const timeFormatted = fmt(r);
+  const iconStr = ICONS[act] || "⏻";
+  const labelStr = lng === "ar" ? (LABELS_AR[act] || act) : (LABELS_EN[act] || act);
+
+  if (timer.textContent !== timeFormatted) {
+    timer.textContent = timeFormatted;
+    popDigit(timer);
+  }
+  aIcon.textContent = iconStr;
+  lbl.textContent   = labelStr;
+
+  if (islandTimer) {
+    if (islandTimer.textContent !== timeFormatted) {
+      islandTimer.textContent = timeFormatted;
+      popDigit(islandTimer);
+    }
+  }
+  if (islandIcon) islandIcon.textContent = iconStr;
+  if (islandLbl) islandLbl.textContent = labelStr;
+
+  const pct = total > 0 ? (r / total) : 1;
+  lastPct = pct;
+
+  // Linear bar
+  if (bar) bar.style.width = Math.max(0, Math.min(100, pct * 100)) + "%";
+
+  // Laser bar
+  if (laserFill) laserFill.style.width = Math.max(0, Math.min(100, pct * 100)) + "%";
+
+  // Radial ring (circumference for r=18 is ~113.1)
+  if (ringProg) {
+    const circ = 113.1;
+    ringProg.style.strokeDashoffset = String(circ * (1 - pct));
+  }
+
+  // Segmented reactor cells
+  if (reactorGrid) {
+    const cells = reactorGrid.querySelectorAll(".reactor-cell");
+    const activeCount = Math.round(pct * cells.length);
+    cells.forEach((c, i) => {
+      c.classList.toggle("active", i < activeCount);
+    });
+  }
+
+  const urgent = r <= 60 && r > 0;
+  card.classList.toggle("urgent", urgent);
+  card.classList.toggle("critical", r <= 10 && r > 0);
+};
+
+// Initial settings load
+try {
+  if (window.pywebview && window.pywebview.api) {
+    window.pywebview.api.get_settings().then(s => {
+      if (s && s.countdownStyle) window.setCountdownStyle(s.countdownStyle);
+      if (s && s.theme) document.documentElement.setAttribute("data-theme", s.theme);
+    });
+  }
+} catch(e) {}
+
+card.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  card.classList.add("pressed");
+});
+["mouseup", "mouseleave", "blur"].forEach(ev =>
+  window.addEventListener(ev, () => card.classList.remove("pressed"))
+);
+
+card.addEventListener("click", async (e) => {
+  if (e.button !== 0) return;
+  try {
+    if (window.pywebview && window.pywebview.api) {
+      await window.pywebview.api.cancel_countdown();
+    }
+  } catch (err) {
+    console.error("Cancel error:", err);
+  }
+});
+</script>
+</body>
+</html>
