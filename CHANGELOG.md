@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.0.1] — 2026-10-19
+
+### 🔒 Security
+- **Lock-screen bypass removed**: `unlock_screen()` accepted the literal `admin`
+  in addition to the configured password (`gui/api.py`).
+- **No predictable default LAN password**: a random password is generated on
+  first run (the server is still disabled until explicitly started).
+- **LAN password is hashed** with PBKDF2-HMAC-SHA256 (240k iterations, random
+  salt) in `core/security.py`; the legacy plain-text `remotePassword` key is
+  migrated automatically and never written again. `settings.json` is chmod 600.
+- **Token rotation now revokes everything**: `rotate_token()` and any credential
+  change discard all sessions and issue a fresh master token. Previously old
+  tokens stayed valid forever.
+- **XSS fixed** in the mobile/file-manager and client UIs: remote file names,
+  paths, client IPs and user agents are rendered with `textContent` instead of
+  `innerHTML`; discovery payloads are escaped.
+- **Path traversal blocked** on `/fonts/` and the HTTPS private key is written
+  with `0600` permissions.
+- Passwords are no longer pre-filled in the UI (`index.html`, client login) and
+  the fields are masked.
+
+### 🐞 Functional fixes
+- **Schedules: `display_off` no longer becomes a full shutdown.** It was missing
+  from `VALID_ACTIONS`, so the sanitiser silently rewrote it to `shutdown`.
+- **`hibernate` implemented** for Windows (`shutdown /h`), Linux
+  (`systemctl hibernate`) and macOS.
+- **Keyboard hotkeys from the web UI work**: `{action:"hotkey", keys:[...]}` is
+  accepted; payload limits restored.
+- **Remote pause/resume now controls the countdown** instead of failing as an
+  unknown power action; `/api/abort` reports success on platforms without a
+  native abort command.
+- **Touch-to-click moves the pointer first** using `/api/screen/size`; previously
+  it clicked wherever the host cursor happened to be.
+- `SW_SHOW`/`SW_HIDE` and `KEYEVENTF_KEYUP` are defined on every platform,
+  eliminating two `NameError`s (taskbar toggle and key press returned HTTP 500).
+- `subprocess` is imported in `remote_server` (opening a file from the phone
+  returned HTTP 500).
+- Removed three duplicated, dead handler definitions in `RemoteServer`.
+- The frameless main window is draggable again (pywebview drag region on the
+  brand bar; `easy_drag` is EdgeChromium-only).
+
+### 🌍 UI / i18n
+- Restored the missing token panel (`remoteTokenVal`, copy/rotate) and the
+  “cancel countdown” button referenced by `app.js` but absent from `index.html`.
+- Mobile UI now applies `data-i18n` translations and gained the 21 missing keys;
+  the client UI gained its 15 missing keys (including `lockPlaceholder`).
+- Added the missing Cairo Latin font subsets.
+
+### 📦 Build
+- Added the missing `ShutdownPanel.spec` and `ShutdownPanelClient.spec`
+  (they were excluded by `*.spec` in `.gitignore`) plus `assets/icon.ico`.
+- `build_exe.py` fails with a clear message when a spec is missing.
+- Version bumped to 2.0.1; docs corrected (PyQt6 badge, MIT claim, test counts).
+
 ## [2.0.0] — 2026-08-30
 
 ### 🐞 Critical fixes
@@ -41,7 +95,7 @@
 - Input validation on every endpoint (proper 400 JSON instead of dropped connections).
 - Rotating file logging (`logs/app.log`) replaces print statements.
 - Settings are saved atomically; changing port/bind/HTTPS restarts the server.
-- README rewritten, LICENSE (MIT) added, tests expanded (24 tests).
+- README rewritten, proprietary ARN Technology LICENSE added, tests expanded (24 tests).
 
 ### 📦 Packaging
 - `build_exe.py` fixed (PyInstaller detection actually works; portable `--add-data`;

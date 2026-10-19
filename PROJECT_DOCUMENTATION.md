@@ -5,7 +5,7 @@
 ![ARN Technology](https://img.shields.io/badge/ARN%20Technology-Official%20Project-00d2ff?style=for-the-badge&logo=windows)
 ![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![WebView2](https://img.shields.io/badge/Edge%20WebView2-PyWebView-0078D7?style=for-the-badge&logo=microsoft-edge&logoColor=white)
-![Version](https://img.shields.io/badge/Version-2.0.0-10b981?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.0.1-10b981?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-ARN%20Technology-00d2ff?style=for-the-badge)
 
 # نظام Shutdown Panel المتكامل لإدارة الطاقة والتحكم عن بعد
@@ -112,14 +112,15 @@ shutdown-panel-python/
 │   │   ├── themes.css                  # تعريف متغيرات السمات والألوان المضيئة
 │   │   └── fonts/                      # الخطوط المحلية المرفقة (DS-Digital, Cairo, Outfit)
 │   └── client_web/                     # واجهة عميل سطح المكتب للتحكم عن بعد
-│       ├── index.html                  # لوحة اكتشاف الخوادم والاتصال بالأجهزة الأخرى
-│       ├── app.js                      # منطق الربط، واجهة الفأرة، وبث الشاشة للعميل
-│       └── styles.css                  # تنسيقات واجهة العميل المظلمة
+│       ├── index.html                  # تطبيق صفحة واحدة: الاكتشاف، الاتصال، الفأرة، والبث
+│       ├── fonts.css                   # تعريفات الخطوط المحلية الخاصة بالعميل
+│       ├── themes.css                  # سمات الألوان المشتركة مع اللوحة الرئيسية
+│       └── fonts/                      # ملفات الخطوط المحلية (11 ملفاً)
 │
 ├── assets/                             # الأصول والموارد
 │   └── icon.ico                        # الأيقونة الرسمية عالية الدقة ثلاثية الأبعاد (3D)
 │
-├── tests/                              # حزمة الاختبارات الشاملة (89 اختباراً مؤتمتاً)
+├── tests/                              # حزمة الاختبارات الشاملة (110 اختبارات مؤتمتة)
 │   ├── test_commander.py               # اختبار تنفيذ الأوامر وحماية المسارات
 │   ├── test_scheduler.py               # اختبار دقة العد التنازلي وإلغائه
 │   ├── test_schedules.py               # اختبار صحة الجدولة الأسبوعية
@@ -335,13 +336,13 @@ python build_exe.py
 1. **تنظيف البيئة:** حذف مجلدات `build/` و `dist/` وملفات الكاش المؤقتة.
 2. **تجميع اللوحة الرئيسية:** بناء `ShutdownPanel.exe` باستخدام PyInstaller مع تضمين كافة الخطوط والأيقونات وصفحات الويب محلياً.
 3. **تجميع عميل سطح المكتب:** بناء `ShutdownPanelClient.exe` بصيغة محمولة ومستقلة.
-4. **إنشاء حزمة التثبيت الرسمية:** تجميع ملف `ShutdownPanel_Setup_v2.0.0.exe` عبر محرك **Inno Setup 7** مع دعم كامل للغتين العربية والإنجليزية.
+4. **إنشاء حزمة التثبيت الرسمية:** تجميع ملف `ShutdownPanel_Setup_v2.0.1.exe` عبر محرك **Inno Setup 7** مع دعم كامل للغتين العربية والإنجليزية.
 
 ---
 
 ## 🧪 الاختبارات وضمان الجودة (Testing & QA)
 
-يحتوي المشروع على جناح اختبارات متكامل يضم **89 اختباراً مؤتمتاً** يغطي كافة السيناريوهات والوحدات:
+يحتوي المشروع على جناح اختبارات متكامل يضم **110 اختبارات مؤتمتة** (108 ناجحة + 2 تُخطّى تلقائيًا خارج Windows) تغطي كافة السيناريوهات والوحدات:
 
 ```bash
 # تشغيل جميع الاختبارات والتأكد من نجاحها 100%

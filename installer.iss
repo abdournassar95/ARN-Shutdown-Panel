@@ -6,7 +6,7 @@
 ; ==============================================================================
 
 #define MyAppName "Shutdown Panel"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "ARN Technology (تطوير وبرمجة عبده رجب نصار)"
 #define MyAppURL "https://wa.me/201556710314"
 #define MyAppExeName "ShutdownPanel.exe"
