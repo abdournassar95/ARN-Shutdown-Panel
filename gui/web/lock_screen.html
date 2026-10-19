@@ -858,13 +858,10 @@
             pwdInput.select();
           }
         } else {
-          // Dev preview fallback
-          if (val === 'admin') {
-            window.onUnlockSuccess();
-          } else {
-            errEl.textContent = 'كلمة المرور غير صحيحة';
-            pwdInput.classList.add('shake');
-          }
+          // No bridge: never fake a successful unlock (the old "admin"
+          // fallback effectively bypassed the lock in a plain browser).
+          errEl.textContent = 'تعذر الاتصال بمحرك التطبيق — أعد تشغيل البرنامج';
+          pwdInput.classList.add('shake');
         }
       } catch (err) {
         errEl.textContent = 'حدث خطأ أثناء فك القفل';
