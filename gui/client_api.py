@@ -5,13 +5,12 @@ bypassing CORS restrictions. Also handles UDP auto-discovery.
 """
 
 import json
-import socket
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from core.app_logger import get_logger
 from core.discovery import UDPListener
@@ -90,23 +89,32 @@ class ClientAPI:
     # Connection
     # ------------------------------------------------------------------
     def connect(self, ip: str, port: int, token: str = "") -> dict:
-        """Connect to a server (test reachability)."""
+        """Connects to a server.
+
+        With a token, the token is verified; without one, reachability is
+        probed and the caller is told that authentication is required.
+        """
+        if token and token.strip():
+            return self.connect_with_token(ip, port, token)
+
         self._server_url = f"http://{ip}:{port}"
         self._token = ""
         self._session_token = None
-        
+
         self.logger.info(f"API connect called for {self._server_url}")
 
-        # Test reachability by hitting the root or an API endpoint
         try:
             url = f"{self._server_url}/"
             req = urllib.request.Request(url, method="GET")
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
-                # If we get here, server is definitely alive
+            with urllib.request.urlopen(req, timeout=5.0):
                 return {"ok": True, "needsAuth": True}
         except urllib.error.HTTPError as e:
-            # If we get an HTTP error (like 401 Unauthorized), the server is alive!
-            return {"ok": True, "needsAuth": True}
+            # 401/403 means a Shutdown Panel server answered (but wants auth).
+            if e.code in (401, 403):
+                return {"ok": True, "needsAuth": True}
+            self.logger.warning(f"API connect: unexpected HTTP {e.code}")
+            self._server_url = None
+            return {"ok": False, "error": f"Unexpected HTTP {e.code}"}
         except Exception as e:
             self.logger.error(f"API connect failed: {e}")
             self._server_url = None
@@ -164,7 +172,7 @@ class ClientAPI:
             try:
                 url = f"{self._server_url}/"
                 req = urllib.request.Request(url, method="GET")
-                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                with urllib.request.urlopen(req, timeout=5.0):
                     self._token = ""
                     self._session_token = None
                     return {"ok": True, "needsAuth": True}

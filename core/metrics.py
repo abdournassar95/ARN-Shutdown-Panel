@@ -6,13 +6,11 @@ CPU%, RAM, disk, battery, uptime, core count, and thermal readings.
 import os
 import platform
 import socket
-import subprocess
 import time
 from typing import Any, Dict, Optional
 
 import psutil
 
-from core.app_logger import get_logger
 
 TEMP_CACHE_SECS = 30.0
 

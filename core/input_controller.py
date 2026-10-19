@@ -20,6 +20,10 @@ from core.app_logger import get_logger
 
 IS_WINDOWS = sys.platform == "win32"
 
+# Win32 flag mirrored at module level so key_press() can build its event list
+# on every platform; the SendInput call itself is guarded by IS_WINDOWS.
+KEYEVENTF_KEYUP = 0x0002
+
 # Virtual Key Codes (platform-independent integers)
 VK_VOLUME_MUTE = 0xAD
 VK_VOLUME_DOWN = 0xAE
@@ -106,7 +110,6 @@ if IS_WINDOWS:
     # sizeof(INPUT) is correct on 64-bit builds)
     INPUT_MOUSE = 0
     INPUT_KEYBOARD = 1
-    KEYEVENTF_KEYUP = 0x0002
     KEYEVENTF_UNICODE = 0x0004
 
     class MOUSEINPUT(ctypes.Structure):
@@ -542,6 +545,19 @@ class InputController:
             return False
 
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Capability probing (used by the API and by tests)
+    # ------------------------------------------------------------------
+    @classmethod
+    def input_available(cls) -> bool:
+        """True when mouse/keyboard events can actually be delivered."""
+        return IS_WINDOWS or pyautogui is not None
+
+    @classmethod
+    def audio_available(cls) -> bool:
+        """True when exact master-volume control is supported."""
+        return IS_WINDOWS
+
     @classmethod
     def get_screen_size(cls) -> Dict[str, int]:
         """Returns primary screen dimensions in physical pixels."""

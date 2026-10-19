@@ -847,7 +847,7 @@
       <div class="card-title"><svg viewBox="0 0 24 24" class="ui-icon" style="color:var(--cyan)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> <span data-i18n="loginTitle">تسجيل الدخول</span></div>
       <p style="font-size:0.78rem;color:var(--muted);" data-i18n="loginHelp">أدخل اسم المستخدم وكلمة المرور المسجلة في جهاز الكمبيوتر:</p>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <input type="text" id="authUsername" class="large-select-box" style="text-align:start;" placeholder="admin" value="admin">
+        <input type="text" id="authUsername" class="large-select-box" style="text-align:start;" placeholder="admin" autocomplete="username">
         <input type="password" id="authPassword" class="large-select-box" style="text-align:start;" placeholder="••••••••">
         <button class="btn-big-start cyan-glow" onclick="loginWithCredentials()"><span data-i18n="loginBtn">تسجيل الدخول والاتصال</span></button>
       </div>
@@ -1187,7 +1187,28 @@ const I18N = {
     rename: "إعادة تسمية", delete: "حذف", cancel: "إلغاء", confirm: "تأكيد",
     upload: "رفع ملف", startStream: "بدء البث", stopStream: "إيقاف البث",
     snapshot: "لقطة سريعة", streamHint: "اضغط «بدء البث» لمشاهدة شاشة الكمبيوتر مباشرة",
-    hourUnit: "ساعة", minuteUnit: "دقيقة"
+    hourUnit: "ساعة", minuteUnit: "دقيقة",
+    abortPending: "جارٍ التنفيذ...",
+    clipboardSync: "مزامنة الحافظة",
+    control: "التحكم",
+    fileExplorer: "مستكشف الملفات",
+    files: "الملفات",
+    instantActions: "إجراءات سريعة وفورية",
+    keyboard: "لوحة المفاتيح والكتابة المباشرة",
+    leftClick: "نقر أيسر",
+    liveScreen: "بث الشاشة المباشر",
+    loginHelp: "أدخل بيانات الدخول الموضحة في تطبيق الكمبيوتر",
+    media: "الوسائط",
+    mediaControl: "التحكم بالوسائط",
+    quick: "سريعة",
+    rightClick: "نقر أيمن",
+    screen: "الشاشة",
+    timer: "المؤقت",
+    trackpad: "تراك باد الفأرة",
+    trackpadHint: "المس وحرّك للتحكم بالماوس · نقرة = يسار · إصبعان = يمين",
+    uploadFolder: "رفع مجلد",
+    volume: "مستوى الصوت",
+    lockPlaceholder: "اكتب رسالة تظهر على شاشة القفل",
   },
   en: {
     connected: "Connected", disconnected: "Disconnected",
@@ -1199,11 +1220,40 @@ const I18N = {
     rename: "Rename", delete: "Delete", cancel: "Cancel", confirm: "Confirm",
     upload: "Upload File", startStream: "Start Stream", stopStream: "Stop Stream",
     snapshot: "Snapshot", streamHint: "Press “Start Stream” to watch computer screen live",
-    hourUnit: "Hours", minuteUnit: "Minutes"
+    hourUnit: "Hours", minuteUnit: "Minutes",
+    abortPending: "Aborting...",
+    clipboardSync: "Clipboard sync",
+    control: "Control",
+    fileExplorer: "File explorer",
+    files: "Files",
+    instantActions: "Instant actions",
+    keyboard: "Keyboard & live typing",
+    leftClick: "Left click",
+    liveScreen: "Live screen",
+    loginHelp: "Enter the credentials shown in the desktop app",
+    media: "Media",
+    mediaControl: "Media control",
+    quick: "Quick",
+    rightClick: "Right click",
+    screen: "Screen",
+    timer: "Timer",
+    trackpad: "Mouse trackpad",
+    trackpadHint: "Touch and move to control the pointer · tap = left · two fingers = right",
+    uploadFolder: "Upload folder",
+    volume: "Volume",
+    lockPlaceholder: "Message shown on the lock screen",
   }
 };
 
 function t(k) { return (I18N[currentLang] && I18N[currentLang][k]) || k; }
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    const value = I18N[currentLang] && I18N[currentLang][key];
+    if (value) el.textContent = value;
+  });
+}
 
 function pad(n) { return String(n).padStart(2, "0"); }
 function formatHMS(s) {
@@ -1579,6 +1629,7 @@ function toggleLang() {
   document.documentElement.lang = currentLang;
   document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
   document.getElementById("btnLangToggle").textContent = currentLang === "ar" ? "EN" : "AR";
+  applyI18n();
   populateTimeOptions();
   pollStats();
 }
@@ -1677,33 +1728,139 @@ function toggleTouchMode() {
   document.getElementById("touchModeLabel").textContent = touchMode ? "اللمس: مفعّل" : "اللمس: معطل";
 }
 
-function onScreenTouchClick(e) {
+let remoteScreenSize = null;
+
+async function fetchRemoteScreenSize() {
+  if (remoteScreenSize) return remoteScreenSize;
+  try {
+    const data = await apiFetch("/api/screen/size");
+    if (data && data.width > 0 && data.height > 0) {
+      remoteScreenSize = { width: data.width, height: data.height };
+    }
+  } catch (e) {}
+  return remoteScreenSize || { width: 1920, height: 1080 };
+}
+
+async function onScreenTouchClick(e) {
   if (!touchMode) return;
   const rect = e.target.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-  apiFetch("/api/input/mouse", { method: "POST", body: JSON.stringify({ action: "click", button: "left" }) }).catch(() => {});
+  if (!rect.width || !rect.height) return;
+  const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+  try {
+    const size = await fetchRemoteScreenSize();
+    // Move the pointer to the exact spot first: touch-to-click without this
+    // clicks wherever the cursor happened to be on the host.
+    await apiFetch("/api/input/mouse", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "move_to",
+        x: Math.round(nx * size.width),
+        y: Math.round(ny * size.height),
+      }),
+    });
+    await apiFetch("/api/input/mouse", {
+      method: "POST",
+      body: JSON.stringify({ action: "click", button: "left" }),
+    });
+  } catch (err) {}
 }
 
 // ------------------------------------------------------------ Files Explorer
+// ------------------------------------------------------------ Safe DOM helpers
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? "" : value).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
+
+const FILE_ICON_FOLDER = '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--cyan);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
+const FILE_ICON_FILE = '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>';
+
+// File names/paths come from the remote machine: never interpolate them into
+// innerHTML. Build nodes and use textContent instead.
+function renderFileCards(items, path) {
+  const container = document.getElementById("filesListContainer");
+  if (!container) return;
+  container.textContent = "";
+  const parent = getParentPath(path);
+  if (parent) {
+    const back = document.createElement("div");
+    back.className = "file-card";
+    back.addEventListener("click", goBack);
+    back.innerHTML = '<div class="file-card-icon">↩️</div><div class="file-card-name">رجوع للخلف</div>';
+    container.appendChild(back);
+  }
+  items.forEach(raw => {
+    const item = raw || {};
+    const name = String(item.name === undefined ? "" : item.name);
+    const itemPath = String(item.path === undefined ? "" : item.path);
+    const size = item.size ? Math.round(Number(item.size) / 1024) + " KB" : "";
+
+    const card = document.createElement("div");
+    card.className = "file-card";
+
+    const opts = document.createElement("div");
+    opts.className = "file-card-opts";
+    opts.textContent = "⋮";
+    opts.addEventListener("click", ev => {
+      ev.stopPropagation();
+      promptFileAction(name, itemPath, size, !!item.isDir);
+    });
+
+    const body = document.createElement("div");
+    body.style.cssText = "display:flex;flex-direction:column;align-items:center;width:100%;";
+    body.addEventListener("click", () => {
+      if (item.isDir) openFolder(itemPath);
+      else promptFileAction(name, itemPath, size, false);
+    });
+
+    const icon = document.createElement("div");
+    icon.className = "file-card-icon";
+    icon.innerHTML = item.isDir ? FILE_ICON_FOLDER : FILE_ICON_FILE;
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "file-card-name";
+    nameEl.textContent = name;
+
+    body.appendChild(icon);
+    body.appendChild(nameEl);
+    if (size || item.isDir) {
+      const sizeEl = document.createElement("div");
+      sizeEl.className = "file-card-size";
+      sizeEl.textContent = size || "مجلد";
+      body.appendChild(sizeEl);
+    }
+    card.appendChild(opts);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
+}
+
 async function loadDrives() {
   try {
     const data = await apiFetch("/api/fs/list");
     const bar = document.getElementById("drivesBar");
     if (bar && data.drives) {
-      bar.innerHTML = data.drives.map(d => {
-        const letter = d.replace(":\\\\", "").replace(":\\", "").replace(":", "");
-        return `<div class="drive-card" onclick="openFolder('${d.replace(/\\/g, '\\\\')}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="drive-icon"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>
-          <span>${letter}</span>
-        </div>`;
-      }).join("");
-      if (data.drives.length > 0) openFolder(data.drives[0]);
+      bar.textContent = "";
+      data.drives.forEach(drive => {
+        const letter = String(drive).replace(/[\\/]+$/, "");
+        const card = document.createElement("div");
+        card.className = "drive-card";
+        card.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="drive-icon"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>';
+        const label = document.createElement("span");
+        label.textContent = letter;
+        card.appendChild(label);
+        card.addEventListener("click", () => openFolder(String(drive)));
+        bar.appendChild(card);
+      });
+      if (data.drives.length > 0) openFolder(String(data.drives[0]));
     }
   } catch (e) {}
 }
 
 function getParentPath(path) {
+
   if (!path) return "";
   let p = path.replace(/[\\/]+$/, ""); // remove trailing slashes
   let lastSlash = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
@@ -1727,33 +1884,21 @@ async function openFolder(path) {
   try {
     const data = await apiFetch(`/api/fs/list?path=${encodeURIComponent(path)}`);
     const bc = document.getElementById("breadcrumbsBar");
-    if (bc) bc.innerHTML = `<span class="breadcrumb-item" onclick="loadDrives()">الأقراص</span> / <span>${path}</span>`;
-
-    const container = document.getElementById("filesListContainer");
-    if (container && data.items) {
-      let html = "";
-      const parent = getParentPath(path);
-      if (parent) {
-        html += `
-          <div class="file-card" onclick="goBack()">
-            <div class="file-card-icon">↩️</div>
-            <div class="file-card-name">رجوع للخلف</div>
-          </div>
-        `;
-      }
-      
-      html += data.items.map(item => `
-        <div class="file-card">
-          <div class="file-card-opts" onclick="promptFileAction('${item.name.replace(/'/g, "\\'")}', '${item.path.replace(/\\/g, '\\\\')}', '${item.size || ''}', ${item.isDir}); event.stopPropagation();">⋮</div>
-          <div style="display:flex; flex-direction:column; align-items:center; width:100%;" onclick="${item.isDir ? `openFolder('${item.path.replace(/\\/g, '\\\\')}')` : `promptFileAction('${item.name.replace(/'/g, "\\'")}', '${item.path.replace(/\\/g, '\\\\')}', '${item.size || ''}', false)`}">
-            <div class="file-card-icon">${item.isDir ? '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--cyan);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>' : '<svg viewBox="0 0 24 24" class="ui-icon" style="width:36px;height:36px;stroke:var(--muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>'}</div>
-            <div class="file-card-name">${item.name}</div>
-            ${item.size ? `<div class="file-card-size">${Math.round(item.size/1024)} KB</div>` : (item.isDir ? '<div class="file-card-size">مجلد</div>' : '')}
-          </div>
-        </div>
-      `).join("");
-      container.innerHTML = html;
+    if (bc) {
+      bc.textContent = "";
+      const drives = document.createElement("span");
+      drives.className = "breadcrumb-item";
+      drives.textContent = "الأقراص";
+      drives.addEventListener("click", loadDrives);
+      const sep = document.createElement("span");
+      sep.textContent = " / ";
+      const here = document.createElement("span");
+      here.textContent = String(path);
+      bc.appendChild(drives);
+      bc.appendChild(sep);
+      bc.appendChild(here);
     }
+    if (data.items) renderFileCards(data.items, path);
   } catch (e) {}
 }
 
@@ -1973,6 +2118,7 @@ function toggleTheme() {
   localStorage.setItem("mobile_theme", nextTheme);
 }
 
+applyI18n();
 populateTimeOptions();
 if (localStorage.getItem("remote_token")) {
   pollStats();

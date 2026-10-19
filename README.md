@@ -5,12 +5,12 @@
 
 ![ARN Shutdown Panel Logo](assets/logo.png)
 
-**الإصدار:** v2.0.0 • **المطور:** عبده رجب نصار • **الشركة:** ARN Technology  
+**الإصدار:** v2.0.1 • **المطور:** عبده رجب نصار • **الشركة:** ARN Technology  
 **الهوية:** تصميم عصري فاخر (Dark Glassmorphic UI) مع أداء عالي وسرعة استجابة فائقة.
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://python.org/)
 [![Edge WebView2](https://img.shields.io/badge/Edge_WebView2-PyWebView-0078D7.svg?logo=microsoft-edge&logoColor=white)](https://pywebview.flowrl.com/)
-[![PyQt6](https://img.shields.io/badge/PyQt6-Framework-41CD52.svg?logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
+[![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-0078D4.svg?logo=windows&logoColor=white)](#%D9%85%D8%AA%D8%B7%D9%84%D8%A8%D8%A7%D8%AA-%D8%A7%D9%84%D8%AA%D8%B4%D8%BA%D9%8A%D9%84)
 [![License](https://img.shields.io/badge/License-ARN_Technology-gold.svg)](LICENSE)
 [![Build](https://img.shields.io/badge/Build-RFC--3161_Signed-success.svg)](build_and_sign.ps1)
 
@@ -123,7 +123,7 @@ python client_main.py
 python build_exe.py
 ```
 المخرجات المتولدة داخل مجلد `dist/`:
-- `ShutdownPanel_Setup_v2.0.0.exe`: **حزمة التثبيت الموحدة** عبر Inno Setup والموقعة رقمياً.
+- `ShutdownPanel_Setup_v2.0.1.exe`: **حزمة التثبيت الموحدة** عبر Inno Setup والموقعة رقمياً.
 - `ShutdownPanel.exe`: نسخة محمولة بالكامل للوحة الرئيسية (Standalone).
 - `ShutdownPanelClient.exe`: نسخة محمولة لعميل التحكم عن بُعد.
 

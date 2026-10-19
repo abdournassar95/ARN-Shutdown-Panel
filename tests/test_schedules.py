@@ -114,3 +114,12 @@ def test_engine_day_filter():
     eng.stop()
 
     assert fired == [], "schedule must not fire on the wrong weekday"
+
+
+def test_display_off_and_hibernate_are_preserved():
+    """Regression: display_off used to be silently downgraded to shutdown."""
+    eng = ScheduleEngine(on_fire=lambda s: None)
+    display = eng.add("display_off", "23:00", [0, 1, 2, 3, 4, 5, 6])
+    hibernate = eng.add("hibernate", "22:30", [1])
+    assert display["action"] == "display_off"
+    assert hibernate["action"] == "hibernate"

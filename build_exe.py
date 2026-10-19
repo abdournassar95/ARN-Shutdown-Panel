@@ -92,15 +92,27 @@ def sign_executable(file_path: pathlib.Path):
         pass
 
 
+def _require_spec(name: str) -> pathlib.Path:
+    """Fails fast with an actionable message when a PyInstaller spec is missing."""
+    spec = HERE / name
+    if not spec.exists():
+        raise FileNotFoundError(
+            f"PyInstaller spec not found: {spec}\n"
+            "Restore ShutdownPanel.spec / ShutdownPanelClient.spec from the repository."
+        )
+    return spec
+
+
 def build_server():
     print("\n📦 [1/3] Building Host Server: dist/ShutdownPanel.exe ...")
+    spec = _require_spec("ShutdownPanel.spec")
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
         "--clean",
         "--noconfirm",
-        str(HERE / "ShutdownPanel.spec"),
+        str(spec),
     ]
     subprocess.check_call(cmd)
     out = HERE / "dist" / "ShutdownPanel.exe"
@@ -110,13 +122,14 @@ def build_server():
 
 def build_client():
     print("\n📦 [2/3] Building Remote Client: dist/ShutdownPanelClient.exe ...")
+    spec = _require_spec("ShutdownPanelClient.spec")
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
         "--clean",
         "--noconfirm",
-        str(HERE / "ShutdownPanelClient.spec"),
+        str(spec),
     ]
     subprocess.check_call(cmd)
     out = HERE / "dist" / "ShutdownPanelClient.exe"
@@ -141,9 +154,9 @@ def build_installer():
     cmd = [str(iscc), str(iss_file)]
     print(f"Running: {iscc} {iss_file}")
     subprocess.check_call(cmd)
-    setup_file = HERE / "dist" / "ShutdownPanel_Setup_v2.0.0.exe"
+    setup_file = HERE / "dist" / "ShutdownPanel_Setup_v2.0.1.exe"
     sign_executable(setup_file)
-    print("✅ Installer build complete! Generated at: dist/ShutdownPanel_Setup_v2.0.0.exe")
+    print("✅ Installer build complete! Generated at: dist/ShutdownPanel_Setup_v2.0.1.exe")
     return True
 
 

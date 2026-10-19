@@ -4,6 +4,8 @@ Provides platform-independent command construction and execution for
 Windows, Linux, and macOS with strict validation and exit-code checking.
 """
 
+import getpass
+import os
 import subprocess
 import sys
 from typing import Any, Dict, Optional, Tuple
@@ -68,7 +70,7 @@ class Commander:
             if target_os != "windows":
                 raise ValueError("Remote execution only supported on Windows")
             if action not in ("shutdown", "restart"):
-                raise ValueError(f"Remote action '{action}' is not supported on Windows")
+                raise ValueError(f"Remote action '{action}' is not supported")
             flag = "/r" if action == "restart" else "/s"
             args = ["shutdown.exe", flag, "/m", f"\\\\{h}", "/t", str(delay)]
             if force:
@@ -95,6 +97,11 @@ class Commander:
             if action in ("signout", "sign_out"):
                 return cls._result(
                     "shutdown.exe", ["/l"], "shutdown.exe /l", action
+                )
+
+            if action == "hibernate":
+                return cls._result(
+                    "shutdown.exe", ["/h"], "shutdown.exe /h", action
                 )
 
             if action == "sleep":
@@ -132,9 +139,14 @@ class Commander:
                 "shutdown": ["systemctl", "poweroff"],
                 "restart": ["systemctl", "reboot"],
                 "sleep": ["systemctl", "suspend"],
+                "hibernate": ["systemctl", "hibernate"],
                 "display_off": ["xset", "dpms", "force", "off"],
                 "lock": ["loginctl", "lock-session"],
-                "signout": ["loginctl", "terminate-user", ""],
+                "signout": [
+                    "loginctl",
+                    "terminate-user",
+                    os.environ.get("USER") or getpass.getuser(),
+                ],
             }
             if action not in mapping:
                 raise ValueError(f"Action '{action}' not supported on Linux")
@@ -147,6 +159,7 @@ class Commander:
                 "shutdown": ["osascript", "-e", 'tell app "System Events" to shut down'],
                 "restart": ["osascript", "-e", 'tell app "System Events" to restart'],
                 "sleep": ["pmset", "sleepnow"],
+                "hibernate": ["pmset", "sleepnow"],
                 "display_off": ["pmset", "displaysleepnow"],
                 "lock": [
                     "/System/Library/CoreServices/Menu Extras/User.menu/Contents/"

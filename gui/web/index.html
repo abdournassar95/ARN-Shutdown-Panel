@@ -28,7 +28,7 @@
       
       <!-- Titlebar -->
       <div class="window-titlebar">
-        <div class="brand-section">
+        <div class="brand-section pywebview-drag-region">
           <div class="brand-logo-icon">
             <span id="brandPowerIcon"></span>
           </div>
@@ -142,6 +142,9 @@
                 <button class="ghost-btn" id="btnPauseResume">
                   <span id="cdPauseIcon"></span> <span id="lblBtnPause">إيقاف مؤقت</span>
                 </button>
+                <button class="ghost-btn danger" id="btnCancelTimer">
+                  <span>✖</span> <span id="lblBtnCancel">إلغاء العد التنازلي</span>
+                </button>
               </div>
             </div>
 
@@ -204,12 +207,18 @@
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div>
                   <label class="field-label" style="font-size: 11px;" id="lblUsername">اسم المستخدم</label>
-                  <input type="text" id="inputRemoteUsername" value="admin" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="off" />
+                  <input type="text" id="inputRemoteUsername" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="username" placeholder="admin" />
                 </div>
                 <div>
                   <label class="field-label" style="font-size: 11px;" id="lblPassword">كلمة المرور</label>
-                  <input type="text" id="inputRemotePassword" value="admin" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="off" />
+                  <input type="password" id="inputRemotePassword" class="large-select-box" style="font-size: 13px; padding: 8px 10px; width: 100%; color: var(--text);" autocomplete="new-password" placeholder="••••••••" />
                 </div>
+              </div>
+              <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span id="lblTokenTitle" style="font-size: 11px; color: var(--muted);">رمز الوصول</span>
+                <code id="remoteTokenVal" style="font-size: 12px; color: var(--cyan); background: var(--panel-2); border-radius: 6px; padding: 3px 8px; letter-spacing: 1px;">------</code>
+                <button class="ghost-btn" id="btnCopyToken" style="font-size: 11px; padding: 3px 8px;">📋 نسخ</button>
+                <button class="ghost-btn" id="btnRotateToken" style="font-size: 11px; padding: 3px 8px;">🔄 تجديد</button>
               </div>
               <div id="remoteUrls" style="font-size: 12px; color: var(--cyan); margin-top: 10px; font-family: monospace; word-break: break-all;"></div>
             </div>

@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "  ARN Technology - Shutdown Panel Build & Sign Pipeline" -ForegroundColor Yellow
 Write-Host "  Developer: Abdou Ragab Nassar (عبده رجب نصار)" -ForegroundColor Green
-Write-Host "  Version:   2.0.0 (Production Release)" -ForegroundColor White
+Write-Host "  Version:   2.0.1 (Production Release)" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Clean previous build folders & temporary files
@@ -178,7 +178,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed!"
 }
 
-$setupExe = "dist\ShutdownPanel_Setup_v2.0.0.exe"
+$setupExe = "dist\ShutdownPanel_Setup_v2.0.1.exe"
 if (-not (Test-Path $setupExe)) {
     throw "Installer file not found at $setupExe!"
 }

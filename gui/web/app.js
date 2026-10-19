@@ -634,7 +634,13 @@ async function refreshRemoteStatus() {
       st.clients.forEach(c => {
         const item = document.createElement("div");
         item.style.cssText = "display:flex;justify-content:space-between;padding:6px 10px;background:var(--panel);border-radius:8px;margin-bottom:4px;";
-        item.innerHTML = `<span>📱 ${c.ip} (${c.userAgent})</span><span style="color:var(--ok);">${c.lastAction || t(currentLang, "connected")}</span>`;
+        const ipSpan = document.createElement("span");
+        ipSpan.textContent = `📱 ${c.ip} (${c.userAgent})`;
+        const actionSpan = document.createElement("span");
+        actionSpan.style.color = "var(--ok)";
+        actionSpan.textContent = c.lastAction || t(currentLang, "connected");
+        item.appendChild(ipSpan);
+        item.appendChild(actionSpan);
         clList.appendChild(item);
       });
     } else {
@@ -834,16 +840,21 @@ async function loadSettings() {
 
   const ips = await window.pywebview.api.network_interfaces();
   const bindSelect = document.getElementById("selectBindAddr");
-  bindSelect.innerHTML = `<option value="0.0.0.0">0.0.0.0</option>`;
-  ips.forEach(ip => {
-    bindSelect.innerHTML += `<option value="${ip}">${ip}</option>`;
+  bindSelect.textContent = "";
+  ["0.0.0.0", ...ips].forEach(ip => {
+    const opt = document.createElement("option");
+    opt.value = String(ip);
+    opt.textContent = String(ip);
+    bindSelect.appendChild(opt);
   });
   if (settings.remoteBind) bindSelect.value = settings.remoteBind;
   if (settings.remotePort) document.getElementById("inputPortNum").value = settings.remotePort;
   if (document.getElementById("inputRemoteUsername"))
     document.getElementById("inputRemoteUsername").value = settings.remoteUsername || "admin";
-  if (document.getElementById("inputRemotePassword"))
-    document.getElementById("inputRemotePassword").value = settings.remotePassword || "admin";
+  // The password is never sent back to the renderer: leave the field empty
+  // and only send a new value when the user actually types one.
+  const pwdInput = document.getElementById("inputRemotePassword");
+  if (pwdInput) pwdInput.value = "";
 }
 
 function applyStatsVisibility() {
@@ -870,7 +881,7 @@ function saveSettings() {
   const uInp = document.getElementById("inputRemoteUsername");
   const pInp = document.getElementById("inputRemotePassword");
   if (uInp) settings.remoteUsername = uInp.value.trim() || "admin";
-  if (pInp) settings.remotePassword = pInp.value.trim() || "admin";
+  if (pInp && pInp.value.trim()) settings.remotePassword = pInp.value.trim();
 
   currentLang = settings.language;
   currentTheme = settings.theme;
@@ -901,11 +912,20 @@ const btnSaveCreds = document.getElementById("btnSaveCredentials");
 if (btnSaveCreds) {
   btnSaveCreds.addEventListener("click", async () => {
     const u = (document.getElementById("inputRemoteUsername").value || "admin").trim();
-    const p = (document.getElementById("inputRemotePassword").value || "admin").trim();
+    const p = (document.getElementById("inputRemotePassword").value || "").trim();
+    if (!p) {
+      showToast(t(currentLang, "passwordRequired"), "warn");
+      return;
+    }
     if (window.pywebview && window.pywebview.api) {
-      await window.pywebview.api.remote_set_credentials(u, p);
-      showToast(t(currentLang, "credentialsSaved"), "ok");
-      refreshRemoteStatus();
+      const res = await window.pywebview.api.remote_set_credentials(u, p);
+      if (res && res.ok) {
+        document.getElementById("inputRemotePassword").value = "";
+        showToast(t(currentLang, "credentialsSaved"), "ok");
+        refreshRemoteStatus();
+      } else {
+        showToast((res && res.error) || t(currentLang, "errorGeneric"), "warn");
+      }
     }
   });
 }

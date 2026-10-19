@@ -10,11 +10,9 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# Build outputs
+# Build outputs (PyInstaller .spec files and assets/icon.ico ARE versioned)
 build/
 dist/
-*.spec
-assets/icon.ico
 
 # IDE
 .vscode/
@@ -29,6 +27,9 @@ desktop.ini
 *.local.json
 *.log
 *.rar
+.coverage
+.coverage.*
+htmlcov/
 folderico-*.ico
 .pytest_tmp/
 
