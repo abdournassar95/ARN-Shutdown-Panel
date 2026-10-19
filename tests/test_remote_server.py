@@ -14,9 +14,8 @@ import zipfile
 import pytest
 
 from core import wol as wol_mod
+from core.input_controller import InputController
 from core.remote_server import (
-    DEFAULT_MAX_UPLOAD,
-    MultipartParser,
     RemoteServer,
     generate_app_icon,
     get_local_ips,
@@ -25,7 +24,6 @@ from core.remote_server import (
     sanitize_filename,
 )
 from core.screen_streamer import ScreenStreamer
-from core.input_controller import InputController
 
 PORT = 18123
 
@@ -146,9 +144,10 @@ def test_malformed_json_returns_400(server):
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             status = resp.status
-            body = resp.read()
+            resp.read()
     except urllib.error.HTTPError as e:
-        status, body = e.code, e.read()
+        status = e.code
+        e.read()
     assert status == 400
 
 
@@ -526,6 +525,10 @@ def test_fs_open_endpoint(server, monkeypatch):
             pass
 
 
+@pytest.mark.skipif(
+    not InputController.audio_available(),
+    reason="Exact volume control requires Windows Core Audio",
+)
 def test_media_control_volume_and_actions(server):
     # 1. Test set_volume
     status, body, _ = _req("/api/media/control", method="POST", payload={"action": "set_volume", "percent": 65}, token=server.token)
@@ -553,6 +556,10 @@ def test_media_control_volume_and_actions(server):
     assert data["ok"] is True
 
 
+@pytest.mark.skipif(
+    not InputController.input_available(),
+    reason="No input backend available (headless environment)",
+)
 def test_input_mouse_and_keyboard_endpoints(server):
     # Mouse move & click
     status, body, _ = _req("/api/input/mouse", method="POST", payload={"action": "move", "dx": 5, "dy": 5}, token=server.token)

@@ -21,6 +21,7 @@ import re
 import secrets
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -33,6 +34,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import psutil
 
 from core.app_logger import get_logger
+from core.security import hash_password, verify_password
 from core.clipboard_utils import (
     clipboard_supported,
     get_clipboard_text,
@@ -153,6 +155,24 @@ def is_protected_write_path(path: str) -> bool:
     candidates |= variants
     # Only block Windows/Program Files/Unix system areas, allow root of drives like D:\ and user directories
     return any(re.match(h, c) for c in candidates for h in SYSTEM_AREA_HINTS[1:])
+
+
+def is_app_data_path(path: str) -> bool:
+    """True for the app's private settings/log directory.
+
+    That folder holds the PBKDF2 password hash and logs; it must never be
+    downloadable or writable through the LAN file manager.
+    """
+    if not path:
+        return False
+    try:
+        from core.settings import get_settings_path
+
+        base = os.path.realpath(get_settings_path().parent)
+        target = os.path.realpath(path)
+    except Exception:
+        return False
+    return target == base or target.startswith(base + os.sep)
 
 
 _WINDOWS_RESERVED = {
@@ -532,6 +552,12 @@ def ensure_self_signed_cert(
         )
     )
     cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    try:
+        # The private key must not be readable by other local users.
+        os.chmod(key_path, 0o600)
+        os.chmod(cert_path, 0o644)
+    except OSError:
+        pass
     return str(cert_path), str(key_path)
 
 
@@ -546,6 +572,7 @@ class RemoteServer:
         token: Optional[str] = None,
         username: str = "admin",
         password: str = "admin",
+        password_hash: Optional[str] = None,
         metrics_provider: Optional[Callable[[], Dict[str, Any]]] = None,
         max_upload: int = DEFAULT_MAX_UPLOAD,
         on_lock: Optional[Callable[[str], Dict[str, Any]]] = None,
@@ -564,8 +591,15 @@ class RemoteServer:
         self.bind = "0.0.0.0"
         self.https = False
         self.username = (username or "admin").strip()
-        self.password = (password or "admin").strip()
+        # Only a PBKDF2 hash is kept in memory; the plain-text password never
+        # lives on the server object.
+        if password_hash:
+            self.password_hash = password_hash
+        else:
+            self.password_hash = hash_password((password or "admin").strip())
         self.token = (token or secrets.token_hex(6)).upper()
+        # The token doubles as the master session. Extra sessions are created
+        # by /api/auth/login and are revoked whenever credentials rotate.
         self.sessions: Dict[str, float] = {self.token: time.time()}
         self.started_at: Optional[int] = None
         self.clients: List[Dict[str, Any]] = []
@@ -594,19 +628,53 @@ class RemoteServer:
     # ------------------------------------------------------------------
     # Credentials & Session management
     # ------------------------------------------------------------------
-    def set_credentials(self, username: Optional[str] = None, password: Optional[str] = None):
+    def set_credentials(
+        self,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        password_hash: Optional[str] = None,
+    ):
+        """Updates credentials and revokes every existing session.
+
+        Changing the password (or rotating the token) must not leave previously
+        authenticated phones connected.
+        """
         with self._lock:
-            if username is not None and username.strip():
+            changed = False
+            if username is not None and username.strip() and username.strip() != self.username:
                 self.username = username.strip()
-            if password is not None and password.strip():
-                self.password = password.strip()
+                changed = True
+            if password_hash:
+                self.password_hash = password_hash
+                changed = True
+            elif password is not None and password.strip():
+                self.password_hash = hash_password(password.strip())
+                changed = True
+            if changed:
+                self.revoke_sessions_locked()
             self._qr_cache.clear()
+
+    def revoke_sessions_locked(self):
+        """Rotates the master token and drops all login sessions.
+
+        Caller must hold ``self._lock``.
+        """
+        self.token = secrets.token_hex(6).upper()
+        self.sessions = {self.token: time.time()}
+        self._qr_cache.clear()
+
+    def revoke_sessions(self) -> str:
+        with self._lock:
+            self.revoke_sessions_locked()
+            return self.token
 
     def verify_credentials(self, username: str, password: str) -> bool:
         with self._lock:
             u_ok = secrets.compare_digest((username or "").strip(), self.username)
-            p_ok = secrets.compare_digest((password or "").strip(), self.password)
-            return u_ok and p_ok
+            stored = self.password_hash
+        # PBKDF2 is intentionally slow: run it outside the lock.
+        p_ok = verify_password((password or "").strip(), stored)
+        return u_ok and p_ok
 
     def create_session(self) -> str:
         with self._lock:
@@ -620,19 +688,22 @@ class RemoteServer:
         if not token:
             return False
         clean = token.strip().upper()
+        cutoff = time.time() - 30 * 86400  # sessions expire after 30 days
         with self._lock:
             if secrets.compare_digest(clean, self.token):
                 return True
-            for st in self.sessions:
+            for st, created in list(self.sessions.items()):
+                if created < cutoff:
+                    self.sessions.pop(st, None)
+                    continue
                 if secrets.compare_digest(clean, st):
                     return True
             return False
 
     def rotate_token(self) -> str:
+        """Issues a new master token and invalidates every previous session."""
         with self._lock:
-            self.token = secrets.token_hex(6).upper()
-            self.sessions[self.token] = time.time()
-            self._qr_cache.clear()
+            self.revoke_sessions_locked()
             return self.token
 
     def get_scheme(self) -> str:
@@ -959,12 +1030,25 @@ class _RequestHandler(BaseHTTPRequestHandler):
         pass  # requests are logged selectively via add_log()
 
     # -- helpers -------------------------------------------------------
+    def _security_headers(self):
+        """Baseline hardening for every response served to a browser."""
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; font-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+            "connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'",
+        )
+
     def send_json(self, status: int, data: Dict[str, Any]):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self._security_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -984,6 +1068,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 "Content-Disposition",
                 f'attachment; filename="{safe}"; filename*=UTF-8\'\'{safe}',
             )
+        self._security_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -1096,12 +1181,27 @@ class _RequestHandler(BaseHTTPRequestHandler):
             css_path = WEB_DIR / "themes.css"
             if css_path.exists():
                 self.send_bytes("text/css; charset=utf-8", css_path.read_bytes(), cache=True)
+            else:
+                self.send_json(404, {"ok": False, "error": "Not found"})
             return
             
         if path.startswith("/fonts/"):
-            font_path = WEB_DIR / path.lstrip("/")
-            if font_path.exists() and path.endswith(".woff2"):
-                self.send_bytes("font/woff2", font_path.read_bytes(), cache=True)
+            # Resolve and confine to gui/web/fonts: "/fonts/../x.woff2" must
+            # not escape the web root.
+            fonts_dir = (WEB_DIR / "fonts").resolve()
+            candidate = (WEB_DIR / path.lstrip("/")).resolve()
+            try:
+                candidate.relative_to(fonts_dir)
+            except ValueError:
+                candidate = None
+            if (
+                candidate is not None
+                and candidate.is_file()
+                and candidate.suffix.lower() == ".woff2"
+            ):
+                self.send_bytes("font/woff2", candidate.read_bytes(), cache=True)
+            else:
+                self.send_json(404, {"ok": False, "error": "Not found"})
             return
 
         # Public: health / basic status (no sensitive data)
@@ -1402,12 +1502,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/system/brightness":
-            val = as_int(payload.get("brightness", 50), 50, 0, 100)
-            try:
-                os.system(f'powershell -Command "(Get-WmiObject -Namespace root/WMI -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1, {val})"')
-                self.send_json(200, {"ok": True})
-            except Exception as e:
-                self.send_json(500, {"ok": False, "error": str(e)})
+            val = as_int(payload.get("brightness", payload.get("percent", 50)), 50, 0, 100)
+            ok = InputController.set_brightness_percent(val)
+            self.send_json(200, {"ok": ok, "brightness": val})
             return
 
         self.send_json(404, {"ok": False, "error": "Unknown endpoint"})
@@ -1490,6 +1587,9 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def _fs_download(self, query):
         file_path = query.get("path", [""])[0].strip()
+        if is_app_data_path(file_path):
+            self.send_json(403, {"ok": False, "error": "Access denied"})
+            return
         if not file_path or not os.path.isfile(file_path):
             self.send_json(404, {"ok": False, "error": "File not found"})
             return
@@ -1569,6 +1669,13 @@ class _RequestHandler(BaseHTTPRequestHandler):
         folder_path = query.get("path", [""])[0].strip()
         if not folder_path or not os.path.isdir(folder_path):
             self.send_json(404, {"ok": False, "error": "Directory not found"})
+            return
+        from core.settings import get_settings_path
+
+        base = os.path.realpath(get_settings_path().parent)
+        target = os.path.realpath(folder_path)
+        if target == base or base.startswith(target + os.sep):
+            self.send_json(403, {"ok": False, "error": "Access denied"})
             return
 
         folder_name = os.path.basename(folder_path.rstrip(os.sep)) or "archive"
@@ -1673,7 +1780,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
             raise ApiError(400, "Invalid target directory")
-        if is_protected_write_path(target_dir):
+        if is_protected_write_path(target_dir) or is_app_data_path(target_dir):
             for u in uploaded:
                 try:
                     os.unlink(u["tmp"])
@@ -1708,6 +1815,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
 
     def _fs_open(self, payload):
         target = str(payload.get("path", "")).strip()
+        if is_app_data_path(target):
+            raise ApiError(403, "Access denied")
         if not target or not os.path.exists(target):
             raise ApiError(404, "File not found")
         try:
@@ -1743,7 +1852,7 @@ class _RequestHandler(BaseHTTPRequestHandler):
         target = str(payload.get("path", ""))
         permanent = bool(payload.get("permanent", False))
         # Protection check FIRST (never reveal/act on system paths)
-        if not target or is_protected_path(target):
+        if not target or is_protected_path(target) or is_app_data_path(target):
             self.send_json(403, {"ok": False, "error": "This path is protected"})
             return
         if not os.path.exists(target):
@@ -1791,80 +1900,6 @@ class _RequestHandler(BaseHTTPRequestHandler):
         os.rename(target, dest)
         self.remote.add_log(self.client_address[0], f"Renamed to {new_name}", True)
         self.send_json(200, {"ok": True, "path": dest})
-
-    def _input_mouse(self, payload):
-        action = str(payload.get("action", "move"))
-        if action == "move":
-            dx = as_int(payload.get("dx", 0), 0, -100000, 100000)
-            dy = as_int(payload.get("dy", 0), 0, -100000, 100000)
-            InputController.mouse_move_rel(dx, dy)
-        elif action == "moveto":
-            x = as_int(payload.get("x", 0), 0, 0, 32767)
-            y = as_int(payload.get("y", 0), 0, 0, 32767)
-            InputController.mouse_move_to(x, y)
-        elif action == "click":
-            btn = str(payload.get("button", "left"))
-            dbl = bool(payload.get("double", False))
-            InputController.mouse_click(btn, dbl)
-        elif action == "down":
-            InputController.mouse_down(str(payload.get("button", "left")))
-        elif action == "up":
-            InputController.mouse_up(str(payload.get("button", "left")))
-        elif action == "scroll":
-            dy = as_int(payload.get("dy", 0), 0, -100, 100)
-            InputController.mouse_scroll(dy)
-        else:
-            raise ApiError(400, f"Unknown mouse action '{action}'")
-        self.send_json(200, {"ok": True})
-
-    def _input_keyboard(self, payload):
-        action = str(payload.get("action", "type_text"))
-        if action == "type_text":
-            text = payload.get("text", "")
-            if not isinstance(text, str) or len(text) > 10000:
-                raise ApiError(400, "Invalid text payload")
-            InputController.type_text(text)
-        elif action == "key_press":
-            key = str(payload.get("key", ""))
-            if not key or len(key) > 32:
-                raise ApiError(400, "Invalid key")
-            InputController.key_press(key)
-        elif action == "hotkey":
-            keys = payload.get("keys", [])
-            if (
-                not isinstance(keys, list)
-                or not keys
-                or len(keys) > 6
-                or not all(isinstance(k, str) and len(k) <= 32 for k in keys)
-            ):
-                raise ApiError(400, "Invalid hotkey combination")
-            InputController.hotkey(*keys)
-        else:
-            raise ApiError(400, f"Unknown keyboard action '{action}'")
-        self.send_json(200, {"ok": True})
-
-    def _media_control(self, payload):
-        action = str(payload.get("action", "play_pause"))
-        mapping = {
-            "play_pause": InputController.media_play_pause,
-            "next": InputController.media_next,
-            "prev": InputController.media_prev,
-            "stop": InputController.media_stop,
-            "vol_up": lambda: InputController.volume_up(),
-            "vol_down": lambda: InputController.volume_down(),
-            "mute": InputController.volume_mute,
-        }
-        if action in mapping:
-            mapping[action]()
-        elif action == "set_volume":
-            pct = as_int(payload.get("percent", 50), 50, 0, 100)
-            InputController.set_volume_percent(pct)
-        elif action == "set_brightness":
-            pct = as_int(payload.get("percent", 70), 70, 0, 100)
-            InputController.set_brightness_percent(pct)
-        else:
-            raise ApiError(400, f"Unknown media action '{action}'")
-        self.send_json(200, {"ok": True, "action": action})
 
     def _proc_list(self):
         procs = []
@@ -1961,7 +1996,8 @@ class _RequestHandler(BaseHTTPRequestHandler):
             InputController.mouse_scroll(dy)
             self.send_json(200, {"ok": True})
             return
-        if action == "move_to":
+        # "moveto" is the historical spelling; keep both accepted.
+        if action in ("move_to", "moveto"):
             x = as_int(payload.get("x", 0), 0, 0, 10000)
             y = as_int(payload.get("y", 0), 0, 0, 10000)
             InputController.mouse_move_to(x, y)
@@ -1973,18 +2009,33 @@ class _RequestHandler(BaseHTTPRequestHandler):
         text = payload.get("text")
         key = payload.get("key")
         hotkey = payload.get("hotkey")
+        # The web UI (mobile.html / client_web) sends {action:'hotkey', keys:[...]};
+        # accept that shape as an alias of the native {hotkey:[...]} contract.
+        if hotkey is None and isinstance(payload.get("keys"), list):
+            hotkey = payload.get("keys")
 
         if text is not None:
-            InputController.type_text(str(text))
+            if not isinstance(text, str) or len(text) > 10000:
+                raise ApiError(400, "Invalid text payload")
+            InputController.type_text(text)
             self.send_json(200, {"ok": True})
             return
         if key is not None:
-            ok = InputController.key_press(str(key))
+            key_str = str(key)
+            if not key_str or len(key_str) > 32:
+                raise ApiError(400, "Invalid key")
+            ok = InputController.key_press(key_str)
             self.send_json(200, {"ok": ok})
             return
-        if hotkey is not None and isinstance(hotkey, list):
-            keys = [str(k) for k in hotkey]
-            ok = InputController.hotkey(*keys)
+        if hotkey is not None:
+            if (
+                not isinstance(hotkey, list)
+                or not hotkey
+                or len(hotkey) > 6
+                or not all(isinstance(k, str) and 0 < len(k) <= 32 for k in hotkey)
+            ):
+                raise ApiError(400, "Invalid hotkey combination")
+            ok = InputController.hotkey(*hotkey)
             self.send_json(200, {"ok": ok})
             return
         raise ApiError(400, "Missing text, key, or hotkey parameter")

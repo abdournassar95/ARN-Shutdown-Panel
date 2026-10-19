@@ -2,7 +2,6 @@
 API Bridge between the PyWebView JavaScript frontend and the Python Core (v2).
 """
 
-from core.input_controller import InputController
 import json
 from typing import Any, Callable, Dict, List, Optional
 
@@ -10,12 +9,22 @@ import webview
 
 from core.app_logger import get_logger
 from core.commander import Commander
+from core.input_controller import InputController
 from core.metrics import MetricsCollector
 from core.remote_server import RemoteServer, get_local_ips, https_available
 from core.schedules import ScheduleEngine
 from core.scheduler import Scheduler
 from core.settings import SettingsManager
 from core.version import __version__
+
+
+def _as_port(value: Any, default: int = 8080) -> int:
+    """Parses a port from JSON without letting a bad value crash startup."""
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return default
+    return port if 1 <= port <= 65535 else default
 
 
 class AppAPI:
@@ -50,13 +59,22 @@ class AppAPI:
         # ---------------- LAN server ----------------
         initial_token = self.settings_manager.settings.get("remoteToken")
         initial_user = self.settings_manager.settings.get("remoteUsername", "admin")
-        initial_pass = self.settings_manager.settings.get("remotePassword", "admin")
+        initial_hash = self.settings_manager.settings.get("remotePasswordHash", "")
+        if not initial_hash:
+            # Never ship a predictable "admin/admin" LAN password: generate a
+            # random one. The user sets their own from the Remote tab.
+            import secrets as _secrets
+
+            initial_hash = self.settings_manager.set_remote_password(
+                _secrets.token_urlsafe(12)
+            )
+            self.logger.info("Generated a random initial LAN password")
         self.remote_server = RemoteServer(
             on_command=self._on_remote_command,
             on_abort=self._on_remote_abort,
             token=initial_token if initial_token else None,
             username=initial_user,
-            password=initial_pass,
+            password_hash=initial_hash or None,
             metrics_provider=self.system_info,
             on_lock=self.remote_lock_screen,
             on_unlock=self.remote_unlock_screen,
@@ -68,7 +86,7 @@ class AppAPI:
         if self.settings_manager.settings.get("remoteEnabled", False):
             try:
                 b = self.settings_manager.settings.get("remoteBind", "0.0.0.0")
-                p = int(self.settings_manager.settings.get("remotePort", 8080))
+                p = _as_port(self.settings_manager.settings.get("remotePort", 8080))
                 h = bool(self.settings_manager.settings.get("httpsEnabled", False))
                 self.remote_server.start(b, p, https=h)
             except Exception as e:
@@ -128,9 +146,10 @@ class AppAPI:
     def unlock_screen(self, password: str = "") -> Dict[str, Any]:
         if not self._is_locked:
             return {"ok": True, "locked": False, "message": "الشاشة غير مقفلة"}
-        expected_pass = self.settings_manager.settings.get("remotePassword", "admin")
         given_pass = (password or "").strip()
-        if given_pass == expected_pass or given_pass == "admin":
+        # Only the configured password is accepted; the previous hard-coded
+        # "admin" bypass made the local lock screen open to anyone.
+        if given_pass and self.settings_manager.verify_remote_password(given_pass):
             return self._perform_unlock()
         return {"ok": False, "error": "كلمة المرور غير صحيحة"}
 
@@ -190,7 +209,6 @@ class AppAPI:
     # Scheduler callbacks
     # ------------------------------------------------------------------
     def _on_scheduler_tick(self, state: Dict[str, Any]):
-        import threading
         lang = self.settings_manager.settings.get("language", "ar")
         countdown_style = self.settings_manager.settings.get("countdownStyle", "hud")
         state_with_lang = {**state, "lang": lang, "style": countdown_style}
@@ -298,6 +316,20 @@ class AppAPI:
             return self.remote_lock_screen()
         if action == "custom_unlock":
             return self.remote_unlock_screen()
+        # The mobile/client UIs pause and resume the *countdown*; these are
+        # scheduler operations, not power actions for Commander.
+        if action in ("pause", "pause_countdown"):
+            ok = self.scheduler.pause()
+            return {
+                "ok": ok,
+                "display": "Countdown paused" if ok else "No active countdown",
+            }
+        if action in ("resume", "resume_countdown"):
+            ok = self.scheduler.resume()
+            return {
+                "ok": ok,
+                "display": "Countdown resumed" if ok else "Countdown is not paused",
+            }
         if delay_secs > 0:
             st = self.start_countdown(action, delay_secs, force)
             return {"ok": True, "display": f"{action} after {delay_secs}s", "state": st}
@@ -311,6 +343,10 @@ class AppAPI:
     def _on_remote_abort(self) -> Dict[str, Any]:
         self.cancel_countdown()
         plan = Commander.plan_abort()
+        if not plan.get("supported", True):
+            # Nothing to abort at OS level (Linux/macOS): the countdown itself
+            # is already cancelled, which is what the caller asked for.
+            return {"ok": True, "display": "Countdown cancelled", "error": None}
         ok, disp, _pid, err = Commander.execute(plan)
         return {"ok": ok, "display": disp, "error": err}
 
@@ -446,13 +482,22 @@ class AppAPI:
     # Settings
     # ------------------------------------------------------------------
     def get_settings(self) -> Dict[str, Any]:
-        return self.settings_manager.settings
+        # Never leak the password hash (or legacy plain text) to the renderer.
+        return {
+            k: v
+            for k, v in self.settings_manager.settings.items()
+            if k not in ("remotePasswordHash", "remotePassword")
+        }
 
     def set_settings(self, next_settings: Dict[str, Any]) -> Dict[str, Any]:
+        next_settings = dict(next_settings or {})
+        # The renderer may echo the hash back; it is never accepted from there.
+        next_settings.pop("remotePasswordHash", None)
+        new_password = next_settings.pop("remotePassword", None)
         prev = self.settings_manager.settings
         prev_remote = prev.get("remoteEnabled", False)
         prev_bind = prev.get("remoteBind", "0.0.0.0")
-        prev_port = int(prev.get("remotePort", 8080))
+        prev_port = _as_port(prev.get("remotePort", 8080))
         prev_https = bool(prev.get("httpsEnabled", False))
 
         # Schedules are managed via their own API: never overwrite from here
@@ -460,14 +505,17 @@ class AppAPI:
         saved = self.settings_manager.save(next_settings)
         self.scheduler.set_warn_before(saved.get("warnBefore", 30))
 
-        if "remoteUsername" in next_settings or "remotePassword" in next_settings:
-            self.remote_server.set_credentials(
-                saved.get("remoteUsername"), saved.get("remotePassword")
-            )
+        if new_password:
+            username = saved.get("remoteUsername", "admin")
+            pwd_hash = self.settings_manager.set_remote_password(str(new_password))
+            self.remote_server.set_credentials(username, password_hash=pwd_hash)
+            self.settings_manager.save({"remoteToken": self.remote_server.token})
+        elif "remoteUsername" in next_settings:
+            self.remote_server.set_credentials(saved.get("remoteUsername"), None)
 
         curr_remote = saved.get("remoteEnabled", False)
         curr_bind = saved.get("remoteBind", "0.0.0.0")
-        curr_port = int(saved.get("remotePort", 8080))
+        curr_port = _as_port(saved.get("remotePort", 8080))
         curr_https = bool(saved.get("httpsEnabled", False))
 
         server_needs_restart = (
@@ -502,7 +550,9 @@ class AppAPI:
         if curr_c_style != prev_c_style:
             self._countdown_js(f"window.setCountdownStyle && window.setCountdownStyle('{curr_c_style}');")
 
-        return saved
+        return {
+            k: v for k, v in saved.items() if k not in ("remotePasswordHash", "remotePassword")
+        }
 
     # ------------------------------------------------------------------
     # Remote server controls
@@ -511,11 +561,24 @@ class AppAPI:
         return self.remote_server.get_status()
 
     def remote_set_credentials(self, username: str, password: str) -> Dict[str, Any]:
+        """Updates the LAN credentials.
+
+        An empty *password* keeps the current one, so the UI never has to
+        round-trip the secret. Any change revokes existing sessions and issues
+        a new access token.
+        """
         u = (username or "admin").strip()
-        p = (password or "admin").strip()
-        self.remote_server.set_credentials(u, p)
-        self.settings_manager.save({"remoteUsername": u, "remotePassword": p})
-        return {"ok": True, "username": u}
+        p = (password or "").strip()
+        if p:
+            pwd_hash = self.settings_manager.set_remote_password(p)
+            self.remote_server.set_credentials(u, password_hash=pwd_hash)
+        else:
+            self.remote_server.set_credentials(u, None)
+        self.settings_manager.save({
+            "remoteUsername": u,
+            "remoteToken": self.remote_server.token,
+        })
+        return {"ok": True, "username": u, "token": self.remote_server.token}
 
     def remote_start(self) -> Dict[str, Any]:
         b = self.settings_manager.settings.get("remoteBind", "0.0.0.0")
@@ -529,6 +592,7 @@ class AppAPI:
     def remote_rotate_token(self) -> str:
         tkn = self.remote_server.rotate_token()
         self.settings_manager.save({"remoteToken": tkn})
+        self.logger.info("LAN access token rotated; previous sessions revoked")
         return tkn
 
     def remote_qr(self, base_url: Optional[str] = None) -> str:
