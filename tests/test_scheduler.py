@@ -1,6 +1,5 @@
 import time
 
-import pytest
 
 from core.scheduler import Scheduler
 

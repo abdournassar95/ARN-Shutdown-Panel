@@ -58,7 +58,6 @@ def main():
     screen_size = InputController.get_screen_size()
     sw = screen_size.get("width", 1920)
     sh = screen_size.get("height", 1080)
-    scale = InputController.get_dpi_scale()
 
     win_w = 950
     win_h = 650

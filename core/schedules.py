@@ -4,12 +4,19 @@ Example: shutdown every day at 23:00, restart every Friday at 02:00.
 """
 
 import threading
-import time
 import uuid
 from datetime import date, datetime
 from typing import Any, Callable, Dict, List, Optional
 
-VALID_ACTIONS = {"shutdown", "restart", "sleep", "hibernate", "lock", "signout"}
+VALID_ACTIONS = {
+    "shutdown",
+    "restart",
+    "sleep",
+    "hibernate",
+    "display_off",
+    "lock",
+    "signout",
+}
 
 
 class ScheduleEngine:
@@ -42,6 +49,13 @@ class ScheduleEngine:
     def _sanitize(s: Dict[str, Any]) -> Dict[str, Any]:
         action = str(s.get("action", "shutdown"))
         if action not in VALID_ACTIONS:
+            # Never silently downgrade an unsupported action to shutdown:
+            # "display_off" used to become a full power-off this way.
+            from core.app_logger import get_logger
+
+            get_logger().warning(
+                "Unknown schedule action %r; falling back to 'shutdown'", action
+            )
             action = "shutdown"
         time_str = str(s.get("time", "23:00"))
         try:

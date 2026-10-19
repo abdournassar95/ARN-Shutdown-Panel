@@ -15,6 +15,11 @@ from typing import Optional
 
 IS_WINDOWS = sys.platform == "win32"
 
+# Fallbacks defined at module level so the manager stays import-safe and
+# callable on non-Windows platforms (the Win32 calls themselves are no-ops).
+SW_HIDE = 0
+SW_SHOW = 5
+
 if IS_WINDOWS:
     import ctypes
     from ctypes import wintypes
@@ -49,9 +54,6 @@ if IS_WINDOWS:
     HWND_TOPMOST = -1
     SWP_SHOWWINDOW = 0x0040
     SWP_FRAMECHANGED = 0x0020
-    SW_HIDE = 0
-    SW_SHOW = 5
-
     SM_XVIRTUALSCREEN = 76
     SM_YVIRTUALSCREEN = 77
     SM_CXVIRTUALSCREEN = 78

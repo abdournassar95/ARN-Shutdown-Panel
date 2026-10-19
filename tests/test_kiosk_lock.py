@@ -2,8 +2,6 @@
 Unit tests for core/kiosk_lock.py (KioskLockManager).
 """
 
-import time
-import pytest
 from core.kiosk_lock import KioskLockManager
 
 

@@ -4,7 +4,6 @@ Wake-on-LAN: builds and sends magic packets to power on machines remotely.
 
 import re
 import socket
-import struct
 from typing import Optional
 
 MAC_PATTERN = re.compile(r"^\s*([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\s*$")
