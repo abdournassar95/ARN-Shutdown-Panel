@@ -1,0 +1,125 @@
+name: Build & Release — ARN Shutdown Panel
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (مثال: v2.0.1)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if (Test-Path requirements-dev.txt) { pip install -r requirements-dev.txt }
+          pip install pyinstaller
+
+      - name: Verify specs
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ShutdownPanel.spec)) { throw "ShutdownPanel.spec مفقود — راجع docs" }
+          if (-not (Test-Path ShutdownPanelClient.spec)) { throw "ShutdownPanelClient.spec مفقود" }
+          if (-not (Test-Path assets/icon.ico)) { Write-Warning "assets/icon.ico غير موجود — سيولّد تلقائياً" }
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          python -m pytest -v
+
+      - name: Build EXEs (PyInstaller)
+        shell: pwsh
+        run: |
+          python build_exe.py
+          if (-not (Test-Path dist/ShutdownPanel.exe)) { throw "ShutdownPanel.exe لم يُبنَ" }
+          if (-not (Test-Path dist/ShutdownPanelClient.exe)) { throw "ShutdownPanelClient.exe لم يُبنَ" }
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe غير موجود بعد التثبيت" }
+          & $iscc /? | Out-Null
+          Write-Host "Inno Setup جاهز: $iscc"
+
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "فشل بناء المثبّت" }
+          Get-ChildItem dist\*.exe | Format-Table Name, Length
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Set-Location dist
+          Get-ChildItem *.exe | ForEach-Object {
+            $h = (Get-FileHash $_.Name -Algorithm SHA256).Hash.ToLower()
+            "$h  $($_.Name)" | Out-File -Append SHA256SUMS.txt -Encoding ascii
+          }
+          cat SHA256SUMS.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShutdownPanel-Windows-${{ github.ref_name }}
+          path: |
+            dist/ShutdownPanel.exe
+            dist/ShutdownPanelClient.exe
+            dist/ShutdownPanel_Setup_*.exe
+            dist/SHA256SUMS.txt
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ShutdownPanel.exe
+            dist/ShutdownPanelClient.exe
+            dist/ShutdownPanel_Setup_*.exe
+            dist/SHA256SUMS.txt
+          generate_release_notes: false
+          body_path: RELEASE_NOTES_${{ github.ref_name }}.md
+          # في حال عدم وجود ملف RELEASE_NOTES خاص بالإصدار، استخدم CHANGELOG
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # إشعار نجاح البناء (اختياري — يمكن ربطه بـ Telegram/Discord)
+  notify:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "### ARN Shutdown Panel — البناء التلقائي" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tag: \`${{ github.ref_name }}\` • Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "الحالة: \`${{ needs.build-windows.result }}\`" >> $GITHUB_STEP_SUMMARY
