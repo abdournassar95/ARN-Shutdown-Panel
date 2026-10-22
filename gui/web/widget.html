@@ -132,11 +132,6 @@
       box-shadow: 0 0 8px var(--ok, #34d399);
       animation: glow 1.8s ease-in-out infinite;
     }
-    .status-dot.alert {
-      background: var(--danger, #fb7185);
-      box-shadow: 0 0 8px var(--danger, #fb7185);
-      animation: glow 0.7s ease-in-out infinite;
-    }
     .status-txt {
       font-family: "Outfit", "Cairo", system-ui, sans-serif;
       font-size: 0.62rem;
@@ -145,13 +140,9 @@
       direction: ltr;
       letter-spacing: 0.04em;
     }
-    .status-txt.alert {
-      color: var(--danger, #fb7185);
-    }
 
     /* Sub-elements for alternative designs */
     .pill-divider { display: none; }
-    .hud-track { display: none; }
 
     /* ==========================================================================
        STYLE 1: CYBER (Default Glowing Cyber Glass)
@@ -256,22 +247,6 @@
       font-size: 0.58rem;
       letter-spacing: 1px;
     }
-    [data-widget-style="hud"] .hud-track {
-      display: block;
-      width: 82%;
-      height: 3px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-top: 2px;
-    }
-    [data-widget-style="hud"] .hud-fill {
-      height: 100%;
-      width: 50%;
-      background: var(--cyan, #22d3ee);
-      box-shadow: 0 0 6px var(--cyan, #22d3ee);
-      transition: width 0.9s linear;
-    }
 
     /* ==========================================================================
        STYLE 4: LUXURY (Luxury Chrono Neomorphic)
@@ -365,12 +340,6 @@
       0%   { background-position: 125% 0; }
       100% { background-position: -125% 0; }
     }
-    .card:has(.cd-active)::before {
-      background: linear-gradient(90deg, transparent 0%, var(--danger, #fb7185) 35%, #ffffff 50%, var(--danger, #fb7185) 65%, transparent 100%);
-      background-size: 250% 100%;
-      filter: drop-shadow(0 0 6px var(--danger, #fb7185));
-      animation-duration: 1.4s;
-    }
 
     /* ALWAYS-ON: breathing outer glow */
     .card {
@@ -379,13 +348,6 @@
     @keyframes cardBreath {
       0%, 100% { box-shadow: 0 0 12px rgba(34, 211, 238, 0.15), 0 0 4px rgba(34, 211, 238, 0.1); }
       50%      { box-shadow: 0 0 26px rgba(34, 211, 238, 0.45), 0 0 10px rgba(34, 211, 238, 0.25); }
-    }
-    .card:has(.cd-active) {
-      animation: cardBreathDanger 1s ease-in-out infinite;
-    }
-    @keyframes cardBreathDanger {
-      0%, 100% { box-shadow: 0 0 14px rgba(251, 113, 133, 0.25); }
-      50%      { box-shadow: 0 0 32px rgba(251, 113, 133, 0.7); }
     }
 
     .card-inner::after {
@@ -426,50 +388,6 @@
       100% { opacity: 1; transform: translateY(0); }
     }
 
-    /* Countdown active state on the card */
-    .card-inner.cd-active {
-      border-color: rgba(251, 113, 133, 0.75) !important;
-      box-shadow: -5px 0 26px rgba(251, 113, 133, 0.30),
-                  -4px 0 22px rgba(0, 0, 0, 0.6);
-    }
-    .card-inner.cd-active:hover {
-      border-color: rgba(251, 113, 133, 0.95) !important;
-      box-shadow: -7px 0 34px rgba(251, 113, 133, 0.45),
-                  -4px 0 22px rgba(0, 0, 0, 0.6);
-    }
-    /* Critical state: last minute */
-    .card-inner.cd-active.cd-critical {
-      animation: cdCriticalPulse 0.9s ease-in-out infinite;
-    }
-    @keyframes cdCriticalPulse {
-      0%, 100% {
-        border-color: rgba(251, 113, 133, 0.55);
-        box-shadow: -5px 0 22px rgba(0,0,0,0.6), -3px 0 18px rgba(251,113,133,0.20);
-      }
-      50% {
-        border-color: rgba(251, 113, 133, 1);
-        box-shadow: -6px 0 34px rgba(0,0,0,0.6), -6px 0 42px rgba(251,113,133,0.65);
-      }
-    }
-    .card-inner.cd-critical .status-dot.alert {
-      animation: glow 0.4s ease-in-out infinite;
-    }
-    .card-inner.cd-critical .status-txt.alert {
-      animation: txtBlink 0.9s steps(2, jump-none) infinite;
-    }
-    @keyframes txtBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-    /* HUD bar: gradient + flowing glow */
-    .hud-fill {
-      background: linear-gradient(90deg, var(--cyan-2, #06b6d4), var(--cyan, #22d3ee), #a5f3fc);
-      background-size: 200% 100%;
-      animation: hudFlow 2.4s linear infinite;
-      box-shadow: 0 0 6px var(--cyan, #22d3ee), 0 0 14px rgba(34, 211, 238, 0.4);
-    }
-    @keyframes hudFlow {
-      0%   { background-position: 0% 0; }
-      100% { background-position: 200% 0; }
-    }
 
     /* Luxury: gold shimmer on the time */
     [data-widget-style="luxury"] .time-val {
@@ -553,10 +471,6 @@
             </div>
           </div>
 
-          <!-- Seconds progress bar for HUD style -->
-          <div class="hud-track">
-            <div class="hud-fill" id="hudFill"></div>
-          </div>
         </div>
 
         <!-- Analog Canvas clock view (Collapsed 64px tab) -->
@@ -699,7 +613,7 @@
       ctx.fill();
     }
 
-    function popSecond(el) {
+    function popClockTime(el) {
       if (!el) return;
       el.classList.remove("tick-pop");
       void el.offsetWidth;
@@ -716,7 +630,7 @@
       const mEl = document.getElementById("tMin");
       if (hEl) hEl.textContent = pad(h);
       if (mEl) mEl.textContent = pad(n.getMinutes());
-      if (tval) popSecond(tval);
+      if (tval) popClockTime(tval);
 
       const DAYS = lang === "ar" ? DAYS_AR : DAYS_EN;
       const MONTHS = lang === "ar" ? MONTHS_AR : MONTHS_EN;
@@ -725,21 +639,21 @@
         dval.textContent =
           DAYS[n.getDay()] + (lang === "ar" ? "، " : ", ") + n.getDate() + " " + MONTHS[n.getMonth()];
       }
-
-      // Update HUD seconds progress bar
-      const hudFill = document.getElementById("hudFill");
-      if (hudFill) {
-        const secPct = (n.getSeconds() / 59) * 100;
-        hudFill.style.width = secPct + "%";
-      }
-
-      if (!collapsed) drawClock();
     }
-    setInterval(tick, 1000);
-    tick();
 
-    // Smooth sweeping second hand while the analog view is visible
-    setInterval(() => { if (collapsed) drawClock(); }, 120);
+    function scheduleMinuteTick() {
+      const now = new Date();
+      const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+      setTimeout(() => {
+        tick();
+        scheduleMinuteTick();
+      }, delay);
+    }
+
+    tick();
+    scheduleMinuteTick();
+
+    setInterval(() => { if (collapsed) drawClock(); }, 1000);
 
     window.setCollapsedUI = function(isCollapsed) {
       collapsed = isCollapsed;
@@ -755,54 +669,6 @@
       }
     };
 
-    // Countdown status
-    window.__onCountdownTick = function (state) {
-      const el = document.getElementById("stxt");
-      const dot = document.getElementById("sdot");
-      const cardInner = document.querySelector(".card-inner");
-      const active = state && state.action && state.remainingSecs > 0;
-      if (active) {
-        const r = state.remainingSecs;
-        const txt = [Math.floor(r / 3600), Math.floor((r % 3600) / 60), r % 60].map(pad).join(":");
-        if (el && el.textContent !== txt) {
-          el.textContent = txt;
-          el.classList.remove("swap");
-          void el.offsetWidth;
-          el.classList.add("swap");
-        }
-        if (el) el.classList.add("alert");
-        if (dot) dot.classList.add("alert");
-        if (cardInner) {
-          cardInner.classList.add("cd-active");
-          cardInner.classList.toggle("cd-critical", r <= 60);
-        }
-      } else {
-        if (el && el.textContent !== "ABDOU NASSAR") {
-          el.textContent = "ABDOU NASSAR";
-          el.classList.remove("swap");
-          void el.offsetWidth;
-          el.classList.add("swap");
-        }
-        if (el) el.classList.remove("alert");
-        if (dot) dot.classList.remove("alert");
-        if (cardInner) {
-          cardInner.classList.remove("cd-active", "cd-critical");
-        }
-      }
-    };
-
-    async function pollStatus() {
-      try {
-        if (window.pywebview && window.pywebview.api) {
-          const st = await window.pywebview.api.countdown_state();
-          if (st && st.remainingSecs > 0) window.__onCountdownTick(st);
-          else window.__onCountdownTick(null);
-        }
-      } catch (e) {}
-    }
-    setInterval(pollStatus, 2000);
-    pollStatus();
-
     // Load theme, language, and widgetStyle preference from settings
     try {
       if (window.pywebview && window.pywebview.api) {
@@ -817,7 +683,6 @@
             window.setWidgetStyle(s.widgetStyle);
           }
           tick();
-          pollStatus();
         });
       }
     } catch (e) {}

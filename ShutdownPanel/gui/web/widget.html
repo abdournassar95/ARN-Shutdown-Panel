@@ -530,10 +530,20 @@
         hudFill.style.width = secPct + "%";
       }
 
-      drawClock();
     }
-    setInterval(tick, 1000);
     tick();
+    function scheduleMinuteTick() {
+      const now = new Date();
+      const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+      setTimeout(() => {
+        tick();
+        scheduleMinuteTick();
+      }, delay);
+    }
+    scheduleMinuteTick();
+
+    // Refresh the second hand only while the analog clock is visible.
+    setInterval(() => { if (collapsed) drawClock(); }, 1000);
 
     window.setCollapsedUI = function(isCollapsed) {
       collapsed = isCollapsed;
@@ -549,34 +559,6 @@
       }
     };
 
-    // Countdown status
-    window.__onCountdownTick = function (state) {
-      const el = document.getElementById("stxt");
-      const dot = document.getElementById("sdot");
-      if (state && state.action && state.remainingSecs > 0) {
-        const r = state.remainingSecs;
-        if (el) el.textContent = [Math.floor(r / 3600), Math.floor((r % 3600) / 60), r % 60].map(pad).join(":");
-        if (el) el.classList.add("alert");
-        if (dot) dot.classList.add("alert");
-      } else {
-        if (el) el.textContent = "ABDOU NASSAR";
-        if (el) el.classList.remove("alert");
-        if (dot) dot.classList.remove("alert");
-      }
-    };
-
-    async function pollStatus() {
-      try {
-        if (window.pywebview && window.pywebview.api) {
-          const st = await window.pywebview.api.countdown_state();
-          if (st && st.remainingSecs > 0) window.__onCountdownTick(st);
-          else window.__onCountdownTick(null);
-        }
-      } catch (e) {}
-    }
-    setInterval(pollStatus, 2000);
-    pollStatus();
-
     // Load theme, language, and widgetStyle preference from settings
     try {
       if (window.pywebview && window.pywebview.api) {
@@ -591,7 +573,6 @@
             window.setWidgetStyle(s.widgetStyle);
           }
           tick();
-          pollStatus();
         });
       }
     } catch (e) {}
