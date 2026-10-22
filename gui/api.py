@@ -214,7 +214,6 @@ class AppAPI:
         state_with_lang = {**state, "lang": lang, "style": countdown_style}
         js = f"window.__onCountdownTick && window.__onCountdownTick({json_dump(state_with_lang)});"
         self._main_js(js)
-        self._widget_js(js)
         # Only push to overlay if it is already visible
         if self._countdown_visible:
             self._countdown_js(js)

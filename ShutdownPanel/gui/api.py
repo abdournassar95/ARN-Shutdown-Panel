@@ -190,13 +190,11 @@ class AppAPI:
     # Scheduler callbacks
     # ------------------------------------------------------------------
     def _on_scheduler_tick(self, state: Dict[str, Any]):
-        import threading
         lang = self.settings_manager.settings.get("language", "ar")
         countdown_style = self.settings_manager.settings.get("countdownStyle", "hud")
         state_with_lang = {**state, "lang": lang, "style": countdown_style}
         js = f"window.__onCountdownTick && window.__onCountdownTick({json_dump(state_with_lang)});"
         self._main_js(js)
-        self._widget_js(js)
         # Only push to overlay if it is already visible
         if self._countdown_visible:
             self._countdown_js(js)
