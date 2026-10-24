@@ -1,0 +1,6 @@
+{
+  "name": "ARN Shutdown Panel",
+  "description": "Smart Native Shell and remote control gateway for local ShutdownPanel PC server",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
